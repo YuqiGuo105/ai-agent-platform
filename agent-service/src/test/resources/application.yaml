@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: agent-service
+  ai:
+    openai:
+      api-key: test-api-key-for-testing-only

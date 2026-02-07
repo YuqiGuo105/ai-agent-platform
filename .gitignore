@@ -1,0 +1,86 @@
+# IDE and Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+*.iws
+*.ipr
+.sublime-project
+.sublime-workspace
+
+# Build and Output
+target/
+build/
+dist/
+out/
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+
+# Maven
+.m2/
+*.pom.xml.versionsBackup
+
+# Node (if using npm)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Gradle
+.gradle/
+gradle-app.setting
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+test-results/
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.log
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Temporary Files
+*.tmp
+*.bak
+*.backup
+.~*
+
+# IntelliJ
+*.iml
+.idea/
+out/
+
+# Eclipse
+.project
+.classpath
+.settings/
+.metadata/
+
+# Vim
+.vim/
+*.vim
+
+# System
+Thumbs.db
+.DS_Store
+
+# Maven Wrapper
+.mvn/wrapper/maven-wrapper.jar
