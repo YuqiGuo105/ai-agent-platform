@@ -1,3 +1,10 @@
 spring:
   application:
     name: agent-service
+
+mcp:
+  tools-base-url: http://localhost:8082
+  registry-default-ttl-seconds: 300
+  call-timeout-ms: 1200
+  call-max-retries: 1
+  debug-allow-explicit-tool: true

@@ -14,6 +14,9 @@ public final class StageNames {
   public static final String FILE_EXTRACT = "file_extract";
   public static final String RAG = "rag";
   public static final String TOOL_CALL = "tool_call";
+  public static final String TOOL_CALL_START = "tool_call_start";
+  public static final String TOOL_CALL_RESULT = "tool_call_result";
+  public static final String TOOL_CALL_ERROR = "tool_call_error";
   public static final String VERIFY = "verify";
   public static final String ERROR = "error";
 }

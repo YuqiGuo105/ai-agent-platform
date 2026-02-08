@@ -42,13 +42,18 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webflux</artifactId>
 		</dependency>
-		<dependency>
-			<groupId>org.springframework.ai</groupId>
-			<artifactId>spring-ai-starter-model-openai</artifactId>
-		</dependency>
+			<dependency>
+				<groupId>org.springframework.ai</groupId>
+				<artifactId>spring-ai-starter-model-openai</artifactId>
+			</dependency>
+			<dependency>
+				<groupId>com.example</groupId>
+				<artifactId>agent-common</artifactId>
+				<version>${project.version}</version>
+			</dependency>
 
-		<dependency>
-			<groupId>org.projectlombok</groupId>
+			<dependency>
+				<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
 		</dependency>
@@ -125,3 +130,9 @@
 	</pluginRepositories>
 
 </project>
+			<dependency>
+				<groupId>com.example</groupId>
+				<artifactId>agent-common</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+
