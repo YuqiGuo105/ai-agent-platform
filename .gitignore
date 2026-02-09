@@ -57,6 +57,11 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Local Development
+logs/
+.pids/
+*.pid
+
 # Temporary Files
 *.tmp
 *.bak

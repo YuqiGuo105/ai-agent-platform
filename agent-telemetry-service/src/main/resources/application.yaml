@@ -1,3 +1,6 @@
 spring:
   application:
     name: agent-telemetry-service
+
+server:
+  port: 8082

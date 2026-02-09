@@ -1,5 +1,6 @@
 package com.mrpot.agent.common.api;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Map;
@@ -20,13 +21,28 @@ import java.util.UUID;
  * @param options      optional RAG options including topK (defaults to 2) and minScore (defaults to 0.10)
  * @param ext          extensible map for future fields without breaking deserialization
  */
+@Schema(description = "RAG answer request with question, session context, and tool configuration")
 public record RagAnswerRequest(
+    @Schema(description = "User's question", example = "What is the weather today?", required = true)
     String question,
+    
+    @Schema(description = "Chat session ID for memory separation", example = "sess-12345", required = true)
     String sessionId,
+    
+    @Schema(description = "Optional AI model hint", example = "deepseek", nullable = true)
     String model,
-    @Size(max = 3) List<String> fileUrls,
+    
+    @Size(max = 3)
+    @Schema(description = "Optional file URLs (max 3)", example = "[\"https://example.com/doc.pdf\"]", nullable = true, maxLength = 3)
+    List<String> fileUrls,
+    
+    @Schema(description = "Scope mode for privacy checks", example = "AUTO", nullable = true)
     ScopeMode scopeMode,
+    
+    @Schema(description = "Tool profile (BASIC, DEFAULT, FULL)", example = "DEFAULT", nullable = true)
     ToolProfile toolProfile,
+    
+    @Schema(description = "Execution mode (FAST, DEEPTHINKING)", example = "FAST", nullable = true)
     String mode,
     RagOptions options,
     Map<String, Object> ext

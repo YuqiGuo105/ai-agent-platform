@@ -4,3 +4,16 @@ spring:
   ai:
     openai:
       api-key: test-api-key-for-testing-only
+server:
+  port: 0
+
+mcp:
+  tools:
+    base-url: http://localhost:8081
+  registry:
+    default-ttl-seconds: 300
+  call:
+    timeout-ms: 1200
+    max-retries: 1
+  debug:
+    allow-explicit-tool: true
