@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: agent-service-test
+  
+  # Test database configuration
+  datasource:
+    url: ${TEST_DB_URL:jdbc:postgresql://localhost:5432/testdb}
+    username: ${TEST_DB_USERNAME:postgres}
+    password: ${TEST_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  
+  # Test AI configuration
+  ai:
+    openai:
+      api-key: test-api-key-for-testing-only
+      embedding:
+        options:
+          model: text-embedding-3-small
+          dimensions: 1536
+
+# Test server configuration
+server:
+  port: 0
+
+# MCP configuration for tests
+mcp:
+  tools:
+    base-url: http://localhost:8081
+  registry:
+    default-ttl-seconds: 300
+  call:
+    timeout-ms: 1200
+    max-retries: 1
+  debug:
+    allow-explicit-tool: true
+
+# Logging for tests
+logging:
+  level:
+    com.mrpot.agent: DEBUG
+    org.springframework.jdbc: DEBUG

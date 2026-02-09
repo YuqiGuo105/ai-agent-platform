@@ -47,6 +47,12 @@
 		<groupId>org.springdoc</groupId>
 		<artifactId>springdoc-openapi-starter-common</artifactId>
 	</dependency>
+		<!-- pgvector for vector database support -->
+		<dependency>
+			<groupId>com.pgvector</groupId>
+			<artifactId>pgvector</artifactId>
+			<version>0.1.5</version>
+		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>

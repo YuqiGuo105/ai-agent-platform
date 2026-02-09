@@ -7,4 +7,12 @@ public record KbSearchRequest(
     Integer topK,
     Double minScore,
     Map<String, Object> filters
-) {}
+) {
+    private static final int DEFAULT_TOP_K = 5;
+    private static final double DEFAULT_MIN_SCORE = 0.7;
+
+    public KbSearchRequest {
+        topK = (topK == null || topK <= 0) ? DEFAULT_TOP_K : topK;
+        minScore = (minScore == null || minScore < 0) ? DEFAULT_MIN_SCORE : minScore;
+    }
+}

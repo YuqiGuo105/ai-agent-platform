@@ -46,5 +46,10 @@ alibaba:
     pdf-dpi: ${PDF_DPI:150}
     max-text-chars: ${MAX_TEXT_CHARS:50000}
 
+# Agent service URL for KB retrieval
+agent:
+  service:
+    base-url: ${AGENT_SERVICE_URL:http://localhost:8080}
+
 server:
   port: 8081

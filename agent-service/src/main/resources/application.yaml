@@ -9,7 +9,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://centerbeam.proxy.rlwy.net:27055/railway}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD}
+    password: ${DB_PASSWORD:xP0_dhCBdKIyWtZlMYZx2Sdn9BXEYKj~}
     driver-class-name: org.postgresql.Driver
 
   jpa:
