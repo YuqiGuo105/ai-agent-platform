@@ -9,7 +9,7 @@ server:
 
 mcp:
   tools:
-    base-url: http://localhost:8081
+    base-url: ${TOOLS_SERVICE_URL:http://localhost:8081}
   registry:
     default-ttl-seconds: 300
   call:

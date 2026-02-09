@@ -25,8 +25,11 @@ class AnswerStreamOrchestratorTest {
     org.mockito.Mockito.when(registryClient.ensureFresh(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(Mono.just(List.of()));
     ToolInvoker toolInvoker = org.mockito.Mockito.mock(ToolInvoker.class);
+    RagAnswerService ragAnswerService = org.mockito.Mockito.mock(RagAnswerService.class);
+    org.mockito.Mockito.when(ragAnswerService.generateFileExtractionEvents(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        .thenReturn(reactor.core.publisher.Flux.empty());
 
-    AnswerStreamOrchestrator orchestrator = new AnswerStreamOrchestrator(registryClient, toolInvoker);
+    AnswerStreamOrchestrator orchestrator = new AnswerStreamOrchestrator(registryClient, toolInvoker, ragAnswerService);
     ReflectionTestUtils.setField(orchestrator, "allowExplicitTool", false);
 
     RagAnswerRequest request = new RagAnswerRequest(
@@ -59,7 +62,11 @@ class AnswerStreamOrchestratorTest {
     ToolInvoker toolInvoker = org.mockito.Mockito.mock(ToolInvoker.class);
     org.mockito.Mockito.when(toolInvoker.call(org.mockito.ArgumentMatchers.any()))
         .thenReturn(Mono.just(new CallToolResponse(false, "system.ping", null, false, null, Instant.now(), new ToolError(ToolError.INTERNAL, "boom", false))));
-    AnswerStreamOrchestrator orchestrator = new AnswerStreamOrchestrator(registryClient, toolInvoker);
+    RagAnswerService ragAnswerService = org.mockito.Mockito.mock(RagAnswerService.class);
+    org.mockito.Mockito.when(ragAnswerService.generateFileExtractionEvents(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        .thenReturn(reactor.core.publisher.Flux.empty());
+    
+    AnswerStreamOrchestrator orchestrator = new AnswerStreamOrchestrator(registryClient, toolInvoker, ragAnswerService);
     ReflectionTestUtils.setField(orchestrator, "allowExplicitTool", true);
 
     RagAnswerRequest request = new RagAnswerRequest(

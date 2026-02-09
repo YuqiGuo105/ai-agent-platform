@@ -7,26 +7,32 @@ import com.mrpot.agent.common.sse.SseEnvelope;
 import com.mrpot.agent.common.sse.StageNames;
 import com.mrpot.agent.common.tool.mcp.CallToolRequest;
 import com.mrpot.agent.common.tool.mcp.CallToolResponse;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
-
 @Service
 public class AnswerStreamOrchestrator {
   private final ToolRegistryClient registryClient;
   private final ToolInvoker toolInvoker;
+  private final RagAnswerService ragAnswerService;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @Value("${mcp.debug.allow-explicit-tool:false}")
   private boolean allowExplicitTool;
 
-  public AnswerStreamOrchestrator(ToolRegistryClient registryClient, ToolInvoker toolInvoker) {
+  public AnswerStreamOrchestrator(
+      ToolRegistryClient registryClient,
+      ToolInvoker toolInvoker,
+      RagAnswerService ragAnswerService
+  ) {
     this.registryClient = registryClient;
     this.toolInvoker = toolInvoker;
+    this.ragAnswerService = ragAnswerService;
   }
 
   public Flux<SseEnvelope> stream(RagAnswerRequest request, String traceId) {
@@ -47,6 +53,15 @@ public class AnswerStreamOrchestrator {
         request.sessionId()
     ).then();
 
+    // File extraction flow
+    List<String> fileUrls = request.resolveFileUrls(3);
+    Flux<SseEnvelope> fileExtractFlux = ragAnswerService.generateFileExtractionEvents(
+        fileUrls,
+        traceId,
+        request.sessionId(),
+        seq
+    );
+
     Flux<SseEnvelope> toolCallFlux = Mono.fromSupplier(() -> extractDebugToolName(request))
         .filter(name -> name != null && allowExplicitTool)
         .flatMapMany(name -> executeToolCall(name, request, traceId, seq));
@@ -63,7 +78,8 @@ public class AnswerStreamOrchestrator {
     ));
 
     return start
-        .concatWith(ensureFresh.thenMany(toolCallFlux))
+        .concatWith(ensureFresh.thenMany(fileExtractFlux))
+        .concatWith(toolCallFlux)
         .concatWith(answerFlux)
         .concatWith(finalFlux)
         .onErrorResume(e -> Flux.just(createEnvelope(

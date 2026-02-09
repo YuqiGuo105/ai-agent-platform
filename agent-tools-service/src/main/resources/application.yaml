@@ -35,15 +35,16 @@ spring:
         options:
           model: ${DEEPSEEK_CHAT_MODEL:deepseek-chat}
           temperature: ${DEEPSEEK_TEMPERATURE:0.2}
-    
-    dashscope:
-      base-url: ${DASHSCOPE_BASE_URL:https://dashscope-intl.aliyuncs.com/compatible-mode/v1}
-      api-key: ${DASHSCOPE_API_KEY}
-      chat:
-        options:
-          model: ${DASHSCOPE_CHAT_MODEL:qwen-vl-plus}
-          temperature: ${QWEN_TEMPERATURE:0.1}
-          max-tokens: ${QWEN_MAX_TOKENS:2048}
+
+# Alibaba DashScope configuration
+alibaba:
+  dashscope:
+    api-key: ${DASHSCOPE_API_KEY}
+    base-url: ${DASHSCOPE_BASE_URL:https://dashscope-intl.aliyuncs.com/compatible-mode/v1}
+  file:
+    max-pdf-pages: ${MAX_PDF_PAGES:10}
+    pdf-dpi: ${PDF_DPI:150}
+    max-text-chars: ${MAX_TEXT_CHARS:50000}
 
 server:
   port: 8081

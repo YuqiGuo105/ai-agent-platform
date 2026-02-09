@@ -4,6 +4,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.servers.Server;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -11,6 +12,12 @@ import java.util.List;
 
 @Configuration
 public class OpenApiConfig {
+
+  @Value("${AGENT_SERVICE_URL:http://localhost:8080}")
+  private String agentServiceUrl;
+
+  @Value("${AGENT_SERVICE_PROD_URL:https://api.example.com}")
+  private String agentServiceProdUrl;
 
   @Bean
   public OpenAPI agentServiceOpenAPI() {
@@ -23,8 +30,8 @@ public class OpenApiConfig {
                 .name("Agent Platform Team")
                 .email("yuqi.guo17@gmail.com")))
         .servers(List.of(
-            new Server().url("http://localhost:8080").description("Local Development"),
-            new Server().url("https://api.example.com").description("Production")
+            new Server().url(agentServiceUrl).description("Local Development"),
+            new Server().url(agentServiceProdUrl).description("Production")
         ));
   }
 }
