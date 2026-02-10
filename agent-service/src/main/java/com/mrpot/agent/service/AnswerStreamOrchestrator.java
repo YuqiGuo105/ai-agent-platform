@@ -5,10 +5,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mrpot.agent.common.api.RagAnswerRequest;
 import com.mrpot.agent.common.sse.SseEnvelope;
 import com.mrpot.agent.common.sse.StageNames;
+import com.mrpot.agent.common.telemetry.RunLogEnvelope;
 import com.mrpot.agent.common.tool.mcp.CallToolRequest;
 import com.mrpot.agent.common.tool.mcp.CallToolResponse;
+import com.mrpot.agent.service.telemetry.RunLogPublisher;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -20,6 +24,7 @@ public class AnswerStreamOrchestrator {
   private final ToolRegistryClient registryClient;
   private final ToolInvoker toolInvoker;
   private final RagAnswerService ragAnswerService;
+  private final RunLogPublisher publisher;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @Value("${mcp.debug.allow-explicit-tool:false}")
@@ -28,15 +33,27 @@ public class AnswerStreamOrchestrator {
   public AnswerStreamOrchestrator(
       ToolRegistryClient registryClient,
       ToolInvoker toolInvoker,
-      RagAnswerService ragAnswerService
+      RagAnswerService ragAnswerService,
+      RunLogPublisher publisher
   ) {
     this.registryClient = registryClient;
     this.toolInvoker = toolInvoker;
     this.ragAnswerService = ragAnswerService;
+    this.publisher = publisher;
   }
 
   public Flux<SseEnvelope> stream(RagAnswerRequest request, String traceId) {
     AtomicLong seq = new AtomicLong(0);
+    String runId = UUID.randomUUID().toString();
+    long t0 = System.currentTimeMillis();
+
+    // Publish run.start telemetry event
+    publisher.publish(new RunLogEnvelope(
+        "1", "run.start", runId, traceId, request.sessionId(), "userId_placeholder",
+        "GENERAL", "deepseek", Instant.now(),
+        Map.of("question", truncate(request.question(), 3800))
+    ));
+
     Flux<SseEnvelope> start = Flux.just(createEnvelope(
         StageNames.START,
         "Starting",
@@ -68,28 +85,48 @@ public class AnswerStreamOrchestrator {
 
     Flux<SseEnvelope> answerFlux = simulateLlmStream(request, traceId, seq);
 
-    Flux<SseEnvelope> finalFlux = Flux.just(createEnvelope(
-        StageNames.ANSWER_FINAL,
-        "Complete",
-        Map.of("answer", "Final answer here"),
-        seq,
-        traceId,
-        request.sessionId()
-    ));
+    Flux<SseEnvelope> finalFlux = Flux.defer(() -> {
+      long totalMs = System.currentTimeMillis() - t0;
+      // Publish run.final telemetry event
+      publisher.publish(new RunLogEnvelope(
+          "1", "run.final", runId, traceId, request.sessionId(), "userId_placeholder",
+          "GENERAL", "deepseek", Instant.now(),
+          Map.of(
+              "answerFinal", truncate("Final answer here", 11000),
+              "totalLatencyMs", totalMs
+          )
+      ));
+      return Flux.just(createEnvelope(
+          StageNames.ANSWER_FINAL,
+          "Complete",
+          Map.of("answer", "Final answer here"),
+          seq,
+          traceId,
+          request.sessionId()
+      ));
+    });
 
     return start
         .concatWith(ensureFresh.thenMany(fileExtractFlux))
         .concatWith(toolCallFlux)
         .concatWith(answerFlux)
         .concatWith(finalFlux)
-        .onErrorResume(e -> Flux.just(createEnvelope(
-            StageNames.ERROR,
-            "Error: " + e.getMessage(),
-            null,
-            seq,
-            traceId,
-            request.sessionId()
-        )));
+        .onErrorResume(e -> {
+          // Publish run.failed telemetry event
+          publisher.publish(new RunLogEnvelope(
+              "1", "run.failed", runId, traceId, request.sessionId(), "userId_placeholder",
+              "GENERAL", "deepseek", Instant.now(),
+              Map.of("errorCode", e.getClass().getSimpleName())
+          ));
+          return Flux.just(createEnvelope(
+              StageNames.ERROR,
+              "Error: " + e.getMessage(),
+              null,
+              seq,
+              traceId,
+              request.sessionId()
+          ));
+        });
   }
 
   private Flux<SseEnvelope> executeToolCall(
@@ -195,5 +232,10 @@ public class AnswerStreamOrchestrator {
         traceId,
         sessionId
     );
+  }
+
+  private static String truncate(String s, int n) {
+    if (s == null) return "";
+    return s.length() <= n ? s : s.substring(0, n) + " ...[truncated]";
   }
 }

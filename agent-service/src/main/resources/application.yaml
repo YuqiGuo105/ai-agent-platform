@@ -20,6 +20,12 @@ spring:
         format_sql: true
     show-sql: false
 
+  # === RabbitMQ (for telemetry events) ===
+  rabbitmq:
+    addresses: ${RABBITMQ_URL:amqp://rA1koa84s5cFXUdV:SVDGsbiozPydd2YFq4MN5.o3RCsXRBra@switchyard.proxy.rlwy.net:30926}
+    username: ${RABBITMQ_USER:rA1koa84s5cFXUdV}
+    password: ${RABBITMQ_PASS:SVDGsbiozPydd2YFq4MN5.o3RCsXRBra}
+
   # === Redis (Railway Redis instance) ===
   data:
     redis:
@@ -95,9 +101,13 @@ server:
 # === Swagger UI / OpenAPI Documentation ===
 springdoc:
   swagger-ui:
-    path: /swagger-ui
+    path: /swagger-ui.html
+    enabled: true
   api-docs:
     path: /v3/api-docs
+    enabled: true
+  webjars:
+    prefix: /webjars
 
 # === Actuator / Monitoring (optional) ===
 management:

@@ -2,5 +2,39 @@ spring:
   application:
     name: agent-telemetry-service
 
+  # === RabbitMQ Configuration ===
+  rabbitmq:
+    addresses: ${RABBITMQ_URL:amqp://rA1koa84s5cFXUdV:SVDGsbiozPydd2YFq4MN5.o3RCsXRBra@switchyard.proxy.rlwy.net:30926}
+    username: ${RABBITMQ_USER:rA1koa84s5cFXUdV}
+    password: ${RABBITMQ_PASS:SVDGsbiozPydd2YFq4MN5.o3RCsXRBra}
+
+  # === PostgreSQL (for telemetry persistence) ===
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://centerbeam.proxy.rlwy.net:27055/railway}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:xP0_dhCBdKIyWtZlMYZx2Sdn9BXEYKj~}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
 server:
   port: 8082
+
+# === Swagger UI / OpenAPI Documentation ===
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+
+# === Actuator ===
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

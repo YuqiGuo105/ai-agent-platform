@@ -9,7 +9,7 @@ public record KbSearchRequest(
     Map<String, Object> filters
 ) {
     private static final int DEFAULT_TOP_K = 5;
-    private static final double DEFAULT_MIN_SCORE = 0.7;
+    private static final double DEFAULT_MIN_SCORE = 0.2;
 
     public KbSearchRequest {
         topK = (topK == null || topK <= 0) ? DEFAULT_TOP_K : topK;

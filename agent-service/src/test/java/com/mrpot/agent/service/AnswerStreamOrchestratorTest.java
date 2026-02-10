@@ -7,6 +7,7 @@ import com.mrpot.agent.common.api.ToolProfile;
 import com.mrpot.agent.common.sse.StageNames;
 import com.mrpot.agent.common.tool.mcp.CallToolResponse;
 import com.mrpot.agent.common.tool.mcp.ToolError;
+import com.mrpot.agent.service.telemetry.RunLogPublisher;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;
@@ -28,8 +29,9 @@ class AnswerStreamOrchestratorTest {
     RagAnswerService ragAnswerService = org.mockito.Mockito.mock(RagAnswerService.class);
     org.mockito.Mockito.when(ragAnswerService.generateFileExtractionEvents(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(reactor.core.publisher.Flux.empty());
+    RunLogPublisher publisher = org.mockito.Mockito.mock(RunLogPublisher.class);
 
-    AnswerStreamOrchestrator orchestrator = new AnswerStreamOrchestrator(registryClient, toolInvoker, ragAnswerService);
+    AnswerStreamOrchestrator orchestrator = new AnswerStreamOrchestrator(registryClient, toolInvoker, ragAnswerService, publisher);
     ReflectionTestUtils.setField(orchestrator, "allowExplicitTool", false);
 
     RagAnswerRequest request = new RagAnswerRequest(
@@ -65,8 +67,9 @@ class AnswerStreamOrchestratorTest {
     RagAnswerService ragAnswerService = org.mockito.Mockito.mock(RagAnswerService.class);
     org.mockito.Mockito.when(ragAnswerService.generateFileExtractionEvents(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(reactor.core.publisher.Flux.empty());
+    RunLogPublisher publisher = org.mockito.Mockito.mock(RunLogPublisher.class);
     
-    AnswerStreamOrchestrator orchestrator = new AnswerStreamOrchestrator(registryClient, toolInvoker, ragAnswerService);
+    AnswerStreamOrchestrator orchestrator = new AnswerStreamOrchestrator(registryClient, toolInvoker, ragAnswerService, publisher);
     ReflectionTestUtils.setField(orchestrator, "allowExplicitTool", true);
 
     RagAnswerRequest request = new RagAnswerRequest(
