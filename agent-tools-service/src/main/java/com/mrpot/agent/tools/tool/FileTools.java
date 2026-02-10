@@ -7,6 +7,7 @@ import com.mrpot.agent.common.tool.FileUnderstanding;
 import com.mrpot.agent.common.tool.mcp.CallToolResponse;
 import com.mrpot.agent.common.tool.mcp.ToolDefinition;
 import com.mrpot.agent.common.tool.mcp.ToolError;
+import com.mrpot.agent.tools.config.AlibabaConfig;
 import com.mrpot.agent.tools.service.AttachmentService;
 import com.mrpot.agent.tools.service.ToolContext;
 import com.mrpot.agent.tools.service.ToolHandler;
@@ -26,6 +27,7 @@ public class FileTools implements ToolHandler {
   private static final ObjectMapper mapper = new ObjectMapper();
 
   private final AttachmentService attachmentService;
+  private final AlibabaConfig alibabaConfig;
 
   @Override
   public String name() {
@@ -87,7 +89,7 @@ public class FileTools implements ToolHandler {
 
     return new ToolDefinition(
         name(),
-        "Understand file content from URL using Qwen VL",
+        "Understand file content from URL using vision model (Qwen VL or OpenAI Vision)",
         "1.0.0",
         inputSchema,
         outputSchema,
@@ -158,6 +160,10 @@ public class FileTools implements ToolHandler {
   /**
    * Tool for understanding remote files (images, PDFs, text documents).
    * Extracts key text, keywords, and search queries from the file content.
+   * 
+   * Uses vision model configured via VISION_PROVIDER environment variable.
+   * Defaults to Qwen VL (qwen-vl) for backward compatibility.
+   * Can be switched to OpenAI Vision (openai) via configuration.
    *
    * @param url URL of the remote file to understand
    * @return FileUnderstanding containing extracted text, keywords, queries, and error status
@@ -168,10 +174,25 @@ public class FileTools implements ToolHandler {
     }
 
     try {
-      FileUnderstanding result = attachmentService
-          .understandFileUrlWithQwenVl(url)
-          .timeout(Duration.ofSeconds(120))
-          .block();
+      // Check which vision provider to use (defaults to Qwen VL)
+      String visionProvider = alibabaConfig.getFile().getVisionProvider();
+      if (visionProvider == null || visionProvider.isBlank()) {
+        visionProvider = "qwen-vl"; // Default to Qwen VL
+      }
+      
+      FileUnderstanding result;
+      if ("openai".equalsIgnoreCase(visionProvider)) {
+        result = attachmentService
+            .understandFileUrlWithOpenAi(url)
+            .timeout(Duration.ofSeconds(120))
+            .block();
+      } else {
+        // Default to Qwen VL (backward compatible)
+        result = attachmentService
+            .understandFileUrlWithQwenVl(url)
+            .timeout(Duration.ofSeconds(120))
+            .block();
+      }
 
       if (result == null) {
         return new FileUnderstanding("", List.of(), List.of(), "null_result");

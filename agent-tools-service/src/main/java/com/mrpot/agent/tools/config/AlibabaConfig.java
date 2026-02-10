@@ -26,5 +26,6 @@ public class AlibabaConfig {
     private Integer maxPdfPages;
     private Integer pdfDpi;
     private Integer maxTextChars;
+    private String visionProvider;
   }
 }

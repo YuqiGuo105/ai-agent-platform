@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mrpot.agent.common.tool.FileUnderstanding;
 import com.mrpot.agent.tools.client.QwenVlFlashClient;
+import com.mrpot.agent.tools.client.OpenAiVisionClient;
 import com.mrpot.agent.tools.config.AlibabaConfig;
 import java.net.URI;
 import java.net.URL;
@@ -54,6 +55,9 @@ public class AttachmentService {
   @Autowired
   private QwenVlFlashClient qwenVlClient;
   
+  @Autowired
+  private OpenAiVisionClient openAiVisionClient;
+  
   /**
    * Understand file URL with Qwen VL.
    * 
@@ -69,6 +73,25 @@ public class AttachmentService {
       }
       
       return getContentAndProcess(fileUrl);
+    })
+    .subscribeOn(Schedulers.boundedElastic());
+  }
+  
+  /**
+   * Understand file URL with OpenAI Vision.
+   * 
+   * @param fileUrl URL of the file
+   * @return FileUnderstanding with extracted data
+   */
+  public Mono<FileUnderstanding> understandFileUrlWithOpenAi(String fileUrl) {
+    return Mono.defer(() -> {
+      // Validate URL for SSRF
+      if (!isSafeUrl(fileUrl)) {
+        logger.warn("URL rejected due to SSRF check: {}", fileUrl);
+        return Mono.just(new FileUnderstanding("", List.of(), List.of(), "ssrf_check_failed"));
+      }
+      
+      return getContentAndProcessOpenAi(fileUrl);
     })
     .subscribeOn(Schedulers.boundedElastic());
   }
@@ -93,6 +116,35 @@ public class AttachmentService {
                 logger.debug("Calling Qwen VL for file: {}", fileUrl);
                 // Call Qwen VL with base64 content
                 return understandContentMono(base64Content, mimeType);
+                })
+                .switchIfEmpty(Mono.just(new FileUnderstanding("", List.of(), List.of(), "content_download_failed")));
+        })
+        .onErrorResume(e -> {
+          logger.error("Error processing file: {}", fileUrl, e);
+          return Mono.just(new FileUnderstanding("", List.of(), List.of(), "processing_error: " + e.getMessage()));
+        });
+  }
+  
+  private Mono<FileUnderstanding> getContentAndProcessOpenAi(String fileUrl) {
+    // Get MIME type via HEAD request
+    return detectMimeTypeMono(fileUrl)
+        .flatMap(mimeType -> {
+          if (mimeType == null || mimeType.isBlank()) {
+            logger.warn("Could not detect MIME type for {}", fileUrl);
+            return Mono.just(new FileUnderstanding("", List.of(), List.of(), "mime_type_detection_failed"));
+          }
+          
+          // Download and process content (returns base64 encoded)
+          return downloadAndProcessContentMono(fileUrl, mimeType)
+              .flatMap(base64Content -> {
+                if (base64Content == null || base64Content.isBlank()) {
+                  logger.warn("Failed to download/encode content from {}", fileUrl);
+                  return Mono.just(new FileUnderstanding("", List.of(), List.of(), "content_download_failed"));
+                }
+                
+                logger.debug("Calling OpenAI Vision for file: {}", fileUrl);
+                // Call OpenAI Vision with base64 content
+                return understandContentWithOpenAi(base64Content, mimeType);
                 })
                 .switchIfEmpty(Mono.just(new FileUnderstanding("", List.of(), List.of(), "content_download_failed")));
         })
@@ -262,6 +314,58 @@ public class AttachmentService {
   }
   
   /**
+   * Call OpenAI Vision to understand file content and extract text, keywords, queries.
+   */
+  private Mono<FileUnderstanding> understandContentWithOpenAi(String base64Image, String mimeType) {
+    return Mono.fromCallable(() -> {
+      if (openAiVisionClient == null) {
+        logger.warn("OpenAI Vision client not initialized");
+        return new FileUnderstanding(
+            "",
+            List.of(),
+            List.of(),
+            "openai_client_not_initialized"
+        );
+      }
+      
+      try {
+        String prompt = buildPrompt();
+        
+        // Build content parts following the same pattern as Qwen VL
+        List<Map<String, Object>> contentParts = new ArrayList<>();
+        
+        // Add image URL part
+        Map<String, Object> imagePart = new LinkedHashMap<>();
+        imagePart.put("type", "image_url");
+        Map<String, String> imageUrl = new LinkedHashMap<>();
+        imageUrl.put("url", "data:" + mimeType + ";base64," + base64Image);
+        imagePart.put("image_url", imageUrl);
+        contentParts.add(imagePart);
+        
+        // Add text prompt part
+        Map<String, Object> textPart = new LinkedHashMap<>();
+        textPart.put("type", "text");
+        textPart.put("text", prompt);
+        contentParts.add(textPart);
+        
+        // Call OpenAI Vision using the client
+        String responseJson = callOpenAiWithParts(contentParts);
+        return parseUnderstandingOrFallback(responseJson);
+        
+      } catch (Exception e) {
+        logger.error("Failed to call OpenAI Vision API: {}", e.getMessage(), e);
+        return new FileUnderstanding(
+            "",
+            List.of(),
+            List.of(),
+            "openai_vision_error: " + e.getMessage()
+        );
+      }
+    })
+    .subscribeOn(Schedulers.boundedElastic());
+  }
+  
+  /**
    * Call Qwen VL with content parts (following reference code pattern).
    */
   private String callQwenWithParts(List<Map<String, Object>> contentParts) {
@@ -276,6 +380,23 @@ public class AttachmentService {
     extra.put("max_tokens", 512);
     
     return qwenVlClient.chatCompletions(null, List.of(userMsg), extra);
+  }
+  
+  /**
+   * Call OpenAI Vision with content parts.
+   */
+  private String callOpenAiWithParts(List<Map<String, Object>> contentParts) {
+    Map<String, Object> userMsg = new LinkedHashMap<>();
+    userMsg.put("role", "user");
+    userMsg.put("content", contentParts);
+    
+    // Parameters aligned with Qwen VL
+    Map<String, Object> extra = new LinkedHashMap<>();
+    extra.put("temperature", 0.7);
+    extra.put("top_p", 0.8);
+    extra.put("max_tokens", 512);
+    
+    return openAiVisionClient.chatCompletions(List.of(userMsg), extra);
   }
   
   /**

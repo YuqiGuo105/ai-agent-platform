@@ -18,7 +18,7 @@ spring:
   
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY}
+      api-key: ${OPENAI_API_KEY:}
       chat:
         options:
           model: ${OPENAI_CHAT_MODEL:gpt-4.1-mini}
@@ -39,12 +39,14 @@ spring:
 # Alibaba DashScope configuration
 alibaba:
   dashscope:
-    api-key: ${DASHSCOPE_API_KEY}
+    api-key: ${DASHSCOPE_API_KEY:}
     base-url: ${DASHSCOPE_BASE_URL:https://dashscope-intl.aliyuncs.com/compatible-mode/v1}
   file:
     max-pdf-pages: ${MAX_PDF_PAGES:10}
     pdf-dpi: ${PDF_DPI:150}
     max-text-chars: ${MAX_TEXT_CHARS:50000}
+    # Vision provider for file content extraction: "qwen-vl" (default) or "openai"
+    vision-provider: ${VISION_PROVIDER:qwen-vl}
 
 # Agent service URL for KB retrieval
 agent:
