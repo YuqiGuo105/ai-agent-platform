@@ -16,6 +16,11 @@ public interface KnowledgeToolCallJpaRepository extends JpaRepository<KnowledgeT
      * Find all tool calls for a specific run.
      */
     List<KnowledgeToolCallEntity> findByRunId(String runId);
+
+    /**
+     * Find all tool calls for a specific run, ordered by creation time.
+     */
+    List<KnowledgeToolCallEntity> findByRunIdOrderByCreatedAt(String runId);
     
     /**
      * Find all tool calls for a specific tool name.
