@@ -1,123 +1,78 @@
 package com.mrpot.agent.telemetry.consumer;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mrpot.agent.common.telemetry.RunLogEnvelope;
-import com.mrpot.agent.telemetry.entity.KnowledgeRunEntity;
-import com.mrpot.agent.telemetry.repository.KnowledgeRunJpaRepository;
+import com.mrpot.agent.common.telemetry.ToolTelemetryEvent;
+import com.mrpot.agent.telemetry.service.TelemetryProjector;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
-import java.util.List;
-
+/**
+ * RabbitMQ consumer for telemetry events.
+ * Handles both run events and tool events via unified message handler.
+ * 
+ * Features:
+ * - Manual ACK for reliable processing
+ * - Configurable concurrency (2-4 consumers)
+ * - Automatic DLQ routing on failure
+ * - Smart message type detection
+ */
 @Component
 @RequiredArgsConstructor
 public class RunLogConsumer {
 
-    private final KnowledgeRunJpaRepository repo;
+    private static final Logger log = LoggerFactory.getLogger(RunLogConsumer.class);
+    
+    private final TelemetryProjector projector;
+    private final ObjectMapper objectMapper;
 
-    @RabbitListener(queues = "mrpot.telemetry.q", ackMode = "MANUAL", concurrency = "2-4")
-    public void onMessage(RunLogEnvelope env, Message msg, Channel ch) throws Exception {
+    /**
+     * Unified consumer for all telemetry events.
+     * Detects message type from content and routes to appropriate handler.
+     */
+    @RabbitListener(
+        queues = "mrpot.telemetry.q",
+        ackMode = "MANUAL",
+        concurrency = "2-4"
+    )
+    public void onMessage(Message msg, Channel ch) throws Exception {
         long tag = msg.getMessageProperties().getDeliveryTag();
+        String body = new String(msg.getBody());
+        
         try {
-            handle(env);
+            // Parse JSON to determine message type
+            JsonNode json = objectMapper.readTree(body);
+            String type = json.has("type") ? json.get("type").asText() : "";
+            
+            boolean processed;
+            if (type.startsWith("tool.")) {
+                // Tool telemetry event
+                ToolTelemetryEvent event = objectMapper.treeToValue(json, ToolTelemetryEvent.class);
+                processed = projector.processToolEvent(event);
+                log.debug("Tool event processed={}: type={}, toolCallId={}", 
+                    processed, event.type(), event.toolCallId());
+            } else if (type.startsWith("run.")) {
+                // Run telemetry event
+                RunLogEnvelope env = objectMapper.treeToValue(json, RunLogEnvelope.class);
+                processed = projector.processRunEvent(env);
+                log.debug("Run event processed={}: type={}, runId={}", 
+                    processed, env.type(), env.runId());
+            } else {
+                log.warn("Unknown event type: {}", type);
+                processed = false;
+            }
+            
             ch.basicAck(tag, false);
         } catch (Exception ex) {
-            // 失败：拒绝并进入 DLQ（不 requeue，避免无限循环）
+            log.error("Failed to process telemetry event: error={}", ex.getMessage(), ex);
+            // Reject and route to DLQ (no requeue to avoid infinite loop)
             ch.basicNack(tag, false, false);
         }
-    }
-
-    private void handle(RunLogEnvelope e) {
-        String type = e.type();
-        switch (type) {
-            case "run.start" -> onStart(e);
-            case "run.rag_done" -> onRagDone(e);
-            case "run.final" -> onFinal(e);
-            case "run.failed" -> onFailed(e);
-            case "run.cancelled" -> onCancelled(e);
-            default -> { /* ignore */ }
-        }
-    }
-
-    private void onStart(RunLogEnvelope e) {
-        KnowledgeRunEntity ent = repo.findById(e.runId()).orElseGet(() -> {
-            KnowledgeRunEntity n = new KnowledgeRunEntity();
-            n.setId(e.runId());
-            n.setCreatedAt(Instant.now());
-            return n;
-        });
-
-        ent.setUpdatedAt(Instant.now());
-        ent.setTraceId(e.traceId());
-        ent.setSessionId(e.sessionId());
-        ent.setUserId(e.userId());
-        ent.setMode(e.mode());
-        ent.setModel(e.model());
-        ent.setQuestion(trunc((String) e.data().getOrDefault("question", ""), 3800));
-        ent.setStatus("RUNNING");
-        repo.save(ent);
-    }
-
-    private void onRagDone(RunLogEnvelope e) {
-        repo.findById(e.runId()).ifPresent(ent -> {
-            ent.setUpdatedAt(Instant.now());
-            ent.setKbHitCount(toInt(e.data().get("kbHitCount"), 0));
-            ent.setKbLatencyMs(toLong(e.data().get("kbLatencyMs"), 0L));
-
-            Object ids = e.data().get("kbDocIds");
-            if (ids instanceof List<?> list) {
-                ent.setKbDocIds(String.join(",", list.stream().map(String::valueOf).toList()));
-            } else {
-                ent.setKbDocIds("");
-            }
-            repo.save(ent);
-        });
-    }
-
-    private void onFinal(RunLogEnvelope e) {
-        repo.findById(e.runId()).ifPresent(ent -> {
-            ent.setUpdatedAt(Instant.now());
-            ent.setAnswerFinal(trunc((String) e.data().getOrDefault("answerFinal", ""), 11000));
-            ent.setTotalLatencyMs(toLong(e.data().get("totalLatencyMs"), 0L));
-            ent.setStatus("DONE");
-            repo.save(ent);
-        });
-    }
-
-    private void onFailed(RunLogEnvelope e) {
-        repo.findById(e.runId()).ifPresent(ent -> {
-            ent.setUpdatedAt(Instant.now());
-            ent.setStatus("FAILED");
-            ent.setErrorCode(trunc(String.valueOf(e.data().getOrDefault("errorCode", "UNKNOWN")), 120));
-            repo.save(ent);
-        });
-    }
-
-    private void onCancelled(RunLogEnvelope e) {
-        repo.findById(e.runId()).ifPresent(ent -> {
-            ent.setUpdatedAt(Instant.now());
-            ent.setStatus("CANCELLED");
-            repo.save(ent);
-        });
-    }
-
-    private static String trunc(String s, int n) {
-        if (s == null) return "";
-        return s.length() <= n ? s : s.substring(0, n) + " ...[truncated]";
-    }
-
-    private static int toInt(Object v, int def) {
-        if (v == null) return def;
-        if (v instanceof Number n) return n.intValue();
-        try { return Integer.parseInt(String.valueOf(v)); } catch (Exception ignored) { return def; }
-    }
-
-    private static long toLong(Object v, long def) {
-        if (v == null) return def;
-        if (v instanceof Number n) return n.longValue();
-        try { return Long.parseLong(String.valueOf(v)); } catch (Exception ignored) { return def; }
     }
 }

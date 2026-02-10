@@ -7,6 +7,15 @@ spring:
     addresses: ${RABBITMQ_URL:amqp://rA1koa84s5cFXUdV:SVDGsbiozPydd2YFq4MN5.o3RCsXRBra@switchyard.proxy.rlwy.net:30926}
     username: ${RABBITMQ_USER:rA1koa84s5cFXUdV}
     password: ${RABBITMQ_PASS:SVDGsbiozPydd2YFq4MN5.o3RCsXRBra}
+    listener:
+      simple:
+        # Retry configuration
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
+          max-interval: 10000
+          multiplier: 2.0
 
   # === PostgreSQL (for telemetry persistence) ===
   datasource:
@@ -18,10 +27,30 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
 
 server:
   port: 8082
+
+# === Elasticsearch Configuration ===
+app:
+  elastic:
+    base-url: ${ELASTIC_BASE_URL:https://elasticsearch-production-361a.up.railway.app}
+    username: ${ELASTIC_USERNAME:mrpot}
+    password: ${ELASTIC_PASSWORD:}
+  
+  # === ES Outbox Worker Configuration ===
+  es-outbox:
+    enabled: ${ES_OUTBOX_ENABLED:true}
+    batch-size: ${ES_OUTBOX_BATCH_SIZE:100}
+    max-retries: ${ES_OUTBOX_MAX_RETRIES:5}
+    cleanup-days: ${ES_OUTBOX_CLEANUP_DAYS:7}
+    poll-interval-ms: ${ES_OUTBOX_POLL_MS:5000}
+    cleanup-interval-ms: ${ES_OUTBOX_CLEANUP_MS:3600000}
+    stats-interval-ms: ${ES_OUTBOX_STATS_MS:60000}
 
 # === Swagger UI / OpenAPI Documentation ===
 springdoc:
@@ -38,3 +67,9 @@ management:
     web:
       exposure:
         include: health,info
+
+# === Logging ===
+logging:
+  level:
+    com.mrpot.agent.telemetry: DEBUG
+    org.springframework.amqp: INFO

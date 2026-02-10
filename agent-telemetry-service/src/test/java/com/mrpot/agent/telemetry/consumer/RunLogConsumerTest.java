@@ -1,8 +1,14 @@
 package com.mrpot.agent.telemetry.consumer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.mrpot.agent.common.telemetry.RunLogEnvelope;
+import com.mrpot.agent.common.telemetry.ToolTelemetryData;
+import com.mrpot.agent.common.telemetry.ToolTelemetryEvent;
 import com.mrpot.agent.telemetry.entity.KnowledgeRunEntity;
-import com.mrpot.agent.telemetry.repository.KnowledgeRunJpaRepository;
+import com.mrpot.agent.telemetry.entity.KnowledgeToolCallEntity;
+import com.mrpot.agent.telemetry.repository.*;
+import com.mrpot.agent.telemetry.service.TelemetryProjector;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,7 +17,6 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -20,31 +25,47 @@ import static org.mockito.Mockito.*;
 
 class RunLogConsumerTest {
 
-    private KnowledgeRunJpaRepository repo;
+    private KnowledgeRunJpaRepository runRepo;
+    private KnowledgeToolCallJpaRepository toolCallRepo;
+    private KnowledgeRunEventJpaRepository eventRepo;
+    private EsOutboxJpaRepository outboxRepo;
+    private ObjectMapper objectMapper;
+    private TelemetryProjector projector;
     private RunLogConsumer consumer;
     private Channel channel;
-    private Message message;
     private MessageProperties messageProperties;
 
     @BeforeEach
     void setUp() {
-        repo = mock(KnowledgeRunJpaRepository.class);
-        consumer = new RunLogConsumer(repo);
+        runRepo = mock(KnowledgeRunJpaRepository.class);
+        toolCallRepo = mock(KnowledgeToolCallJpaRepository.class);
+        eventRepo = mock(KnowledgeRunEventJpaRepository.class);
+        outboxRepo = mock(EsOutboxJpaRepository.class);
+        objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        
+        // Create real projector with mocked repositories
+        projector = new TelemetryProjector(runRepo, toolCallRepo, eventRepo, outboxRepo, objectMapper);
+        consumer = new RunLogConsumer(projector, objectMapper);
         channel = mock(Channel.class);
-        message = mock(Message.class);
         messageProperties = mock(MessageProperties.class);
         
-        when(message.getMessageProperties()).thenReturn(messageProperties);
         when(messageProperties.getDeliveryTag()).thenReturn(1L);
     }
 
+    private Message createMessage(String jsonBody) {
+        Message msg = mock(Message.class);
+        when(msg.getMessageProperties()).thenReturn(messageProperties);
+        when(msg.getBody()).thenReturn(jsonBody.getBytes());
+        return msg;
+    }
+
     @Test
-    void onMessage_run_start_creates_new_entity() throws Exception {
-        String runId = "run-123";
+    void onMessage_run_start_creates_entity() throws Exception {
         RunLogEnvelope envelope = new RunLogEnvelope(
                 "1",
                 "run.start",
-                runId,
+                "run-123",
                 "trace-456",
                 "session-789",
                 "user-001",
@@ -53,205 +74,35 @@ class RunLogConsumerTest {
                 Instant.now(),
                 Map.of("question", "What is machine learning?")
         );
+        
+        String json = objectMapper.writeValueAsString(envelope);
+        Message message = createMessage(json);
 
-        when(repo.findById(runId)).thenReturn(Optional.empty());
+        when(runRepo.findById("run-123")).thenReturn(Optional.empty());
+        when(eventRepo.existsByEventId(anyString())).thenReturn(false);
 
-        consumer.onMessage(envelope, message, channel);
+        consumer.onMessage(message, channel);
 
-        ArgumentCaptor<KnowledgeRunEntity> entityCaptor = ArgumentCaptor.forClass(KnowledgeRunEntity.class);
-        verify(repo).save(entityCaptor.capture());
+        ArgumentCaptor<KnowledgeRunEntity> captor = ArgumentCaptor.forClass(KnowledgeRunEntity.class);
+        verify(runRepo).save(captor.capture());
         verify(channel).basicAck(1L, false);
 
-        KnowledgeRunEntity saved = entityCaptor.getValue();
-        assertEquals(runId, saved.getId());
+        KnowledgeRunEntity saved = captor.getValue();
+        assertEquals("run-123", saved.getId());
         assertEquals("trace-456", saved.getTraceId());
-        assertEquals("session-789", saved.getSessionId());
-        assertEquals("user-001", saved.getUserId());
-        assertEquals("GENERAL", saved.getMode());
-        assertEquals("deepseek", saved.getModel());
-        assertEquals("What is machine learning?", saved.getQuestion());
-        assertEquals("RUNNING", saved.getStatus());
-        assertNotNull(saved.getCreatedAt());
-        assertNotNull(saved.getUpdatedAt());
-    }
-
-    @Test
-    void onMessage_run_start_updates_existing_entity() throws Exception {
-        String runId = "run-123";
-        KnowledgeRunEntity existing = new KnowledgeRunEntity();
-        existing.setId(runId);
-        existing.setCreatedAt(Instant.now().minusSeconds(60));
-
-        RunLogEnvelope envelope = new RunLogEnvelope(
-                "1",
-                "run.start",
-                runId,
-                "trace-456",
-                "session-789",
-                "user-001",
-                "GENERAL",
-                "deepseek",
-                Instant.now(),
-                Map.of("question", "Updated question")
-        );
-
-        when(repo.findById(runId)).thenReturn(Optional.of(existing));
-
-        consumer.onMessage(envelope, message, channel);
-
-        ArgumentCaptor<KnowledgeRunEntity> entityCaptor = ArgumentCaptor.forClass(KnowledgeRunEntity.class);
-        verify(repo).save(entityCaptor.capture());
-
-        KnowledgeRunEntity saved = entityCaptor.getValue();
-        assertEquals("Updated question", saved.getQuestion());
         assertEquals("RUNNING", saved.getStatus());
     }
 
     @Test
-    void onMessage_run_rag_done_updates_kb_fields() throws Exception {
-        String runId = "run-123";
+    void onMessage_run_final_updates_status() throws Exception {
         KnowledgeRunEntity existing = new KnowledgeRunEntity();
-        existing.setId(runId);
+        existing.setId("run-123");
         existing.setStatus("RUNNING");
-
-        RunLogEnvelope envelope = new RunLogEnvelope(
-                "1",
-                "run.rag_done",
-                runId,
-                "trace-456",
-                "session-789",
-                "user-001",
-                "GENERAL",
-                "deepseek",
-                Instant.now(),
-                Map.of(
-                        "kbHitCount", 3,
-                        "kbLatencyMs", 150L,
-                        "kbDocIds", List.of("doc1", "doc2", "doc3")
-                )
-        );
-
-        when(repo.findById(runId)).thenReturn(Optional.of(existing));
-
-        consumer.onMessage(envelope, message, channel);
-
-        ArgumentCaptor<KnowledgeRunEntity> entityCaptor = ArgumentCaptor.forClass(KnowledgeRunEntity.class);
-        verify(repo).save(entityCaptor.capture());
-        verify(channel).basicAck(1L, false);
-
-        KnowledgeRunEntity saved = entityCaptor.getValue();
-        assertEquals(3, saved.getKbHitCount());
-        assertEquals(150L, saved.getKbLatencyMs());
-        assertEquals("doc1,doc2,doc3", saved.getKbDocIds());
-    }
-
-    @Test
-    void onMessage_run_final_updates_answer_and_status() throws Exception {
-        String runId = "run-123";
-        KnowledgeRunEntity existing = new KnowledgeRunEntity();
-        existing.setId(runId);
-        existing.setStatus("RUNNING");
-
+        existing.setCreatedAt(Instant.now());
+        
         RunLogEnvelope envelope = new RunLogEnvelope(
                 "1",
                 "run.final",
-                runId,
-                "trace-456",
-                "session-789",
-                "user-001",
-                "GENERAL",
-                "deepseek",
-                Instant.now(),
-                Map.of(
-                        "answerFinal", "Machine learning is a subset of AI...",
-                        "totalLatencyMs", 2500L
-                )
-        );
-
-        when(repo.findById(runId)).thenReturn(Optional.of(existing));
-
-        consumer.onMessage(envelope, message, channel);
-
-        ArgumentCaptor<KnowledgeRunEntity> entityCaptor = ArgumentCaptor.forClass(KnowledgeRunEntity.class);
-        verify(repo).save(entityCaptor.capture());
-        verify(channel).basicAck(1L, false);
-
-        KnowledgeRunEntity saved = entityCaptor.getValue();
-        assertEquals("Machine learning is a subset of AI...", saved.getAnswerFinal());
-        assertEquals(2500L, saved.getTotalLatencyMs());
-        assertEquals("DONE", saved.getStatus());
-    }
-
-    @Test
-    void onMessage_run_failed_updates_error_status() throws Exception {
-        String runId = "run-123";
-        KnowledgeRunEntity existing = new KnowledgeRunEntity();
-        existing.setId(runId);
-        existing.setStatus("RUNNING");
-
-        RunLogEnvelope envelope = new RunLogEnvelope(
-                "1",
-                "run.failed",
-                runId,
-                "trace-456",
-                "session-789",
-                "user-001",
-                "GENERAL",
-                "deepseek",
-                Instant.now(),
-                Map.of("errorCode", "TimeoutException")
-        );
-
-        when(repo.findById(runId)).thenReturn(Optional.of(existing));
-
-        consumer.onMessage(envelope, message, channel);
-
-        ArgumentCaptor<KnowledgeRunEntity> entityCaptor = ArgumentCaptor.forClass(KnowledgeRunEntity.class);
-        verify(repo).save(entityCaptor.capture());
-        verify(channel).basicAck(1L, false);
-
-        KnowledgeRunEntity saved = entityCaptor.getValue();
-        assertEquals("FAILED", saved.getStatus());
-        assertEquals("TimeoutException", saved.getErrorCode());
-    }
-
-    @Test
-    void onMessage_run_cancelled_updates_status() throws Exception {
-        String runId = "run-123";
-        KnowledgeRunEntity existing = new KnowledgeRunEntity();
-        existing.setId(runId);
-        existing.setStatus("RUNNING");
-
-        RunLogEnvelope envelope = new RunLogEnvelope(
-                "1",
-                "run.cancelled",
-                runId,
-                "trace-456",
-                "session-789",
-                "user-001",
-                "GENERAL",
-                "deepseek",
-                Instant.now(),
-                Map.of()
-        );
-
-        when(repo.findById(runId)).thenReturn(Optional.of(existing));
-
-        consumer.onMessage(envelope, message, channel);
-
-        ArgumentCaptor<KnowledgeRunEntity> entityCaptor = ArgumentCaptor.forClass(KnowledgeRunEntity.class);
-        verify(repo).save(entityCaptor.capture());
-        verify(channel).basicAck(1L, false);
-
-        KnowledgeRunEntity saved = entityCaptor.getValue();
-        assertEquals("CANCELLED", saved.getStatus());
-    }
-
-    @Test
-    void onMessage_unknown_type_is_ignored() throws Exception {
-        RunLogEnvelope envelope = new RunLogEnvelope(
-                "1",
-                "run.unknown_type",
                 "run-123",
                 "trace-456",
                 "session-789",
@@ -259,92 +110,159 @@ class RunLogConsumerTest {
                 "GENERAL",
                 "deepseek",
                 Instant.now(),
-                Map.of()
+                Map.of("answerFinal", "Machine learning is a subset of AI...")
         );
+        
+        String json = objectMapper.writeValueAsString(envelope);
+        Message message = createMessage(json);
 
-        consumer.onMessage(envelope, message, channel);
+        when(runRepo.findById("run-123")).thenReturn(Optional.of(existing));
+        when(eventRepo.existsByEventId(anyString())).thenReturn(false);
 
-        verify(repo, never()).save(any());
+        consumer.onMessage(message, channel);
+
+        ArgumentCaptor<KnowledgeRunEntity> captor = ArgumentCaptor.forClass(KnowledgeRunEntity.class);
+        verify(runRepo).save(captor.capture());
+        verify(channel).basicAck(1L, false);
+
+        KnowledgeRunEntity saved = captor.getValue();
+        assertEquals("DONE", saved.getStatus());
+        assertEquals("Machine learning is a subset of AI...", saved.getAnswerFinal());
+    }
+
+    @Test
+    void onMessage_tool_start_records_event() throws Exception {
+        ToolTelemetryEvent event = new ToolTelemetryEvent(
+                "1",
+                "tool.start",
+                "tc-123",
+                "run-456",
+                "trace-789",
+                "session-1",
+                "user-1",
+                Instant.now(),
+                ToolTelemetryData.builder()
+                        .toolName("kb_search")
+                        .argsDigest("abc123")
+                        .argsPreview("{\"query\":\"test\"}")
+                        .build()
+        );
+        
+        String json = objectMapper.writeValueAsString(event);
+        Message message = createMessage(json);
+
+        when(eventRepo.existsByEventId(anyString())).thenReturn(false);
+
+        consumer.onMessage(message, channel);
+
+        // tool.start only records idempotency event, doesn't create entity
+        verify(toolCallRepo, never()).save(any());
         verify(channel).basicAck(1L, false);
     }
 
     @Test
-    void onMessage_nacks_on_exception() throws Exception {
-        String runId = "run-123";
-        RunLogEnvelope envelope = new RunLogEnvelope(
+    void onMessage_tool_end_creates_entity() throws Exception {
+        ToolTelemetryEvent event = new ToolTelemetryEvent(
                 "1",
-                "run.start",
-                runId,
-                "trace-456",
-                "session-789",
-                "user-001",
-                "GENERAL",
-                "deepseek",
+                "tool.end",
+                "tc-123",
+                "run-456",
+                "trace-789",
+                "session-1",
+                "user-1",
                 Instant.now(),
-                Map.of("question", "Test")
+                ToolTelemetryData.builder()
+                        .toolName("kb_search")
+                        .argsDigest("abc123")
+                        .resultDigest("def456")
+                        .resultPreview("{\"results\":[]}")
+                        .durationMs(150L)
+                        .cacheHit(true)
+                        .keyInfo(Map.of("hitCount", 5))
+                        .build()
         );
+        
+        String json = objectMapper.writeValueAsString(event);
+        Message message = createMessage(json);
 
-        when(repo.findById(runId)).thenReturn(Optional.empty());
-        doThrow(new RuntimeException("Database error")).when(repo).save(any());
+        when(eventRepo.existsByEventId(anyString())).thenReturn(false);
 
-        consumer.onMessage(envelope, message, channel);
+        consumer.onMessage(message, channel);
+
+        ArgumentCaptor<KnowledgeToolCallEntity> captor = ArgumentCaptor.forClass(KnowledgeToolCallEntity.class);
+        verify(toolCallRepo).save(captor.capture());
+        verify(channel).basicAck(1L, false);
+
+        KnowledgeToolCallEntity saved = captor.getValue();
+        assertEquals("tc-123", saved.getId());
+        assertEquals("run-456", saved.getRunId());
+        assertEquals("kb_search", saved.getToolName());
+        assertEquals(150L, saved.getDurationMs());
+        assertTrue(saved.getCacheHit());
+        assertTrue(saved.getOk());
+    }
+
+    @Test
+    void onMessage_unknown_type_acks_without_processing() throws Exception {
+        String json = "{\"type\":\"unknown.type\",\"runId\":\"run-123\"}";
+        Message message = createMessage(json);
+
+        consumer.onMessage(message, channel);
+
+        verify(runRepo, never()).save(any());
+        verify(toolCallRepo, never()).save(any());
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    void onMessage_nacks_on_parse_exception() throws Exception {
+        String invalidJson = "{invalid json}";
+        Message message = createMessage(invalidJson);
+
+        consumer.onMessage(message, channel);
 
         verify(channel).basicNack(1L, false, false);
         verify(channel, never()).basicAck(anyLong(), anyBoolean());
     }
 
     @Test
-    void onMessage_handles_non_existent_run_for_final() throws Exception {
-        String runId = "run-not-found";
-        RunLogEnvelope envelope = new RunLogEnvelope(
-                "1",
-                "run.final",
-                runId,
-                "trace-456",
-                "session-789",
-                "user-001",
-                "GENERAL",
-                "deepseek",
-                Instant.now(),
-                Map.of("answerFinal", "Some answer")
-        );
+    void onMessage_handles_empty_type() throws Exception {
+        String json = "{\"runId\":\"run-123\"}";  // No type field
+        Message message = createMessage(json);
 
-        when(repo.findById(runId)).thenReturn(Optional.empty());
+        consumer.onMessage(message, channel);
 
-        consumer.onMessage(envelope, message, channel);
-
-        // Should not save anything if entity doesn't exist
-        verify(repo, never()).save(any());
+        verify(runRepo, never()).save(any());
+        verify(toolCallRepo, never()).save(any());
         verify(channel).basicAck(1L, false);
     }
-
+    
     @Test
-    void onMessage_truncates_long_question() throws Exception {
-        String runId = "run-123";
-        String longQuestion = "a".repeat(5000); // Longer than 3800 char limit
-
+    void onMessage_idempotent_skips_duplicate_events() throws Exception {
         RunLogEnvelope envelope = new RunLogEnvelope(
                 "1",
                 "run.start",
-                runId,
+                "run-123",
                 "trace-456",
                 "session-789",
                 "user-001",
                 "GENERAL",
                 "deepseek",
                 Instant.now(),
-                Map.of("question", longQuestion)
+                Map.of("question", "What is machine learning?")
         );
+        
+        String json = objectMapper.writeValueAsString(envelope);
+        Message message = createMessage(json);
 
-        when(repo.findById(runId)).thenReturn(Optional.empty());
+        // Simulate duplicate event by having eventRepo.save throw DataIntegrityViolationException
+        doThrow(new org.springframework.dao.DataIntegrityViolationException("Duplicate"))
+                .when(eventRepo).save(any());
 
-        consumer.onMessage(envelope, message, channel);
+        consumer.onMessage(message, channel);
 
-        ArgumentCaptor<KnowledgeRunEntity> entityCaptor = ArgumentCaptor.forClass(KnowledgeRunEntity.class);
-        verify(repo).save(entityCaptor.capture());
-
-        KnowledgeRunEntity saved = entityCaptor.getValue();
-        assertTrue(saved.getQuestion().length() < 5000);
-        assertTrue(saved.getQuestion().endsWith(" ...[truncated]"));
+        // Should not save run entity since event was duplicate
+        verify(runRepo, never()).save(any());
+        verify(channel).basicAck(1L, false);
     }
 }

@@ -1,23 +1,19 @@
-package com.mrpot.agent.telemetry.config;
+package com.mrpot.agent.config;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 /**
- * RabbitMQ and JSON configuration for telemetry service.
+ * Jackson ObjectMapper configuration.
  */
 @Configuration
-public class TelemetryAmqpConfig {
+public class JacksonConfig {
 
-    /**
-     * ObjectMapper configured for telemetry events.
-     */
     @Bean
     @Primary
     public ObjectMapper objectMapper() {
@@ -28,13 +24,5 @@ public class TelemetryAmqpConfig {
         // Be lenient with unknown properties
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         return mapper;
-    }
-
-    /**
-     * JSON message converter for RabbitMQ.
-     */
-    @Bean
-    public Jackson2JsonMessageConverter jacksonConverter(ObjectMapper objectMapper) {
-        return new Jackson2JsonMessageConverter(objectMapper);
     }
 }

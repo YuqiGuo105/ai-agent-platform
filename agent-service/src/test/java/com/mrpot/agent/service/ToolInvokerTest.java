@@ -6,28 +6,43 @@ import com.mrpot.agent.common.tool.mcp.CallToolRequest;
 import com.mrpot.agent.common.tool.mcp.CallToolResponse;
 import com.mrpot.agent.common.tool.mcp.ToolError;
 import com.mrpot.agent.common.util.Json;
+import com.mrpot.agent.service.telemetry.ToolCallTelemetryWrapper;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 class ToolInvokerTest {
 
   private MockWebServer server;
+  private ToolCallTelemetryWrapper mockTelemetryWrapper;
 
   @BeforeEach
   void setUp() throws Exception {
     server = new MockWebServer();
     server.start();
+    
+    // Create mock telemetry wrapper that passes through to the actual call
+    mockTelemetryWrapper = Mockito.mock(ToolCallTelemetryWrapper.class);
+    when(mockTelemetryWrapper.wrapCall(any(CallToolRequest.class), any(String.class), any()))
+        .thenAnswer(invocation -> {
+          Function<CallToolRequest, Mono<CallToolResponse>> fn = invocation.getArgument(2);
+          return fn.apply(invocation.getArgument(0));
+        });
   }
 
   @AfterEach
@@ -45,7 +60,7 @@ class ToolInvokerTest {
     WebClient webClient = WebClient.builder()
         .baseUrl(server.url("/").toString())
         .build();
-    ToolInvoker invoker = new ToolInvoker(webClient);
+    ToolInvoker invoker = new ToolInvoker(webClient, mockTelemetryWrapper);
     ReflectionTestUtils.setField(invoker, "timeoutMs", 100L);
 
     CallToolRequest request = new CallToolRequest("system.ping", Json.MAPPER.createObjectNode(), ScopeMode.AUTO, ToolProfile.BASIC, "t", "s");
@@ -62,7 +77,7 @@ class ToolInvokerTest {
     WebClient webClient = WebClient.builder()
         .baseUrl(server.url("/").toString())
         .build();
-    ToolInvoker invoker = new ToolInvoker(webClient);
+    ToolInvoker invoker = new ToolInvoker(webClient, mockTelemetryWrapper);
     ReflectionTestUtils.setField(invoker, "timeoutMs", 1000L);
 
     CallToolRequest request = new CallToolRequest("system.ping", Json.MAPPER.createObjectNode(), ScopeMode.AUTO, ToolProfile.BASIC, "t", "s");

@@ -37,8 +37,13 @@ public class TelemetryAmqpConfig {
     }
 
     @Bean
-    public Binding bindTelemetry(TopicExchange telemetryExchange, Queue telemetryQueue) {
+    public Binding bindRunTelemetry(TopicExchange telemetryExchange, Queue telemetryQueue) {
         return BindingBuilder.bind(telemetryQueue).to(telemetryExchange).with("telemetry.run.*");
+    }
+
+    @Bean
+    public Binding bindToolTelemetry(TopicExchange telemetryExchange, Queue telemetryQueue) {
+        return BindingBuilder.bind(telemetryQueue).to(telemetryExchange).with("telemetry.tool.*");
     }
 
     @Bean
