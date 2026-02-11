@@ -3,7 +3,7 @@ package com.mrpot.agent.service.pipeline.stages;
 import com.mrpot.agent.common.sse.SseEnvelope;
 import com.mrpot.agent.common.sse.StageNames;
 import com.mrpot.agent.service.ConversationHistoryService;
-import com.mrpot.agent.service.model.ChatMessage;
+import com.mrpot.agent.model.ChatMessage;
 import com.mrpot.agent.service.pipeline.PipelineContext;
 import com.mrpot.agent.service.pipeline.Processor;
 import lombok.RequiredArgsConstructor;

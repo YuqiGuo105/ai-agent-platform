@@ -61,9 +61,9 @@ public class RagAnswerRequestTest {
   }
 
   @Test
-  void resolveTopK_withNullOptions_defaultsToTwo() {
+  void resolveTopK_withNullOptions_defaultsToFive() {
     var req = new RagAnswerRequest("query", "sess1", "deepseek", null, null, null, "FAST", null, null);
-    assertEquals(2, req.resolveTopK());
+    assertEquals(5, req.resolveTopK());
   }
 
   @Test

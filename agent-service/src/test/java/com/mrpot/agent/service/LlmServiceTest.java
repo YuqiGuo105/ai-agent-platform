@@ -1,6 +1,6 @@
 package com.mrpot.agent.service;
 
-import com.mrpot.agent.service.model.ChatMessage;
+import com.mrpot.agent.model.ChatMessage;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -26,11 +26,11 @@ class LlmServiceTest {
 
         String result = LlmService.buildPromptWithHistory("Current question", history);
 
-        assertTrue(result.startsWith("【Previous conversation】"));
-        assertTrue(result.contains("User: Q1"));
-        assertTrue(result.contains("Assistant: A1"));
-        assertTrue(result.contains("User: Q2"));
-        assertTrue(result.contains("Assistant: A2"));
+        assertTrue(result.startsWith("【HIS】"));
+        assertTrue(result.contains("U: Q1"));
+        assertTrue(result.contains("A: A1"));
+        assertTrue(result.contains("U: Q2"));
+        assertTrue(result.contains("A: A2"));
         assertTrue(result.endsWith("Current question"));
     }
 
@@ -60,7 +60,7 @@ class LlmServiceTest {
         String result = LlmService.buildPromptWithHistory("Final question", history);
 
         assertNotNull(result);
-        assertTrue(result.contains("【Previous conversation】"));
+        assertTrue(result.contains("【HIS】"));
         assertTrue(result.contains("Final question"));
         // Should contain all history entries
         assertTrue(result.contains("Long question 1"));

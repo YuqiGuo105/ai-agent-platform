@@ -40,9 +40,11 @@ public class RagRetrieveStage implements Processor<Void, SseEnvelope> {
         
         return kbRetrievalService.searchSimilar(searchRequest)
             .map(response -> {
-                // Store RAG context in pipeline context
+                // Store RAG context, documents, and hits in pipeline context
                 String ragContext = response.contextText();
                 context.setRagContext(ragContext);
+                context.setRagDocs(response.docs());
+                context.setRagHits(response.hits());
                 
                 int hitCount = response.hits().size();
                 double topScore = response.hits().isEmpty() ? 0.0 : response.hits().get(0).score();

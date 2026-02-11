@@ -1,4 +1,4 @@
-package com.mrpot.agent.service.model;
+package com.mrpot.agent.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.Instant;

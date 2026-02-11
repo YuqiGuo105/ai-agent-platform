@@ -18,7 +18,7 @@ import java.util.UUID;
  * @param scopeMode    scope mode for privacy/scope checks (defaults to AUTO)
  * @param toolProfile  optional tool profile (e.g. "BASIC", "DEFAULT", "FULL")
  * @param mode         execution mode for reasoning (e.g. "FAST", "DEEPTHINKING"); defaults to "FAST"
- * @param options      optional RAG options including topK (defaults to 2) and minScore (defaults to 0.10)
+ * @param options      optional RAG options including topK (defaults to 5) and minScore (defaults to 0.10)
  * @param ext          extensible map for future fields without breaking deserialization
  */
 @Schema(description = "RAG answer request with question, session context, and tool configuration")
@@ -49,7 +49,7 @@ public record RagAnswerRequest(
 ) {
   private static final String DEFAULT_MODEL = "deepseek";
   private static final String DEFAULT_MODE = "FAST";
-  private static final int DEFAULT_TOP_K = 2;
+  private static final int DEFAULT_TOP_K = 5;
   private static final double MIN_SCORE_DEFAULT = 0.10;
   private static final Set<String> MODELS = Set.of("deepseek", "gemini", "openai");
 

@@ -2,6 +2,8 @@ package com.mrpot.agent.service.pipeline;
 
 import com.mrpot.agent.common.api.RagAnswerRequest;
 import com.mrpot.agent.common.api.ScopeMode;
+import com.mrpot.agent.common.kb.KbDocument;
+import com.mrpot.agent.common.kb.KbHit;
 import com.mrpot.agent.common.policy.ExecutionPolicy;
 import com.mrpot.agent.common.tool.FileItem;
 
@@ -34,6 +36,8 @@ public class PipelineContext {
     // Standard keys for working memory
     public static final String KEY_EXTRACTED_FILES = "extractedFiles";
     public static final String KEY_RAG_CONTEXT = "ragContext";
+    public static final String KEY_RAG_DOCS = "ragDocs";
+    public static final String KEY_RAG_HITS = "ragHits";
     public static final String KEY_FINAL_ANSWER = "finalAnswer";
     
     /**
@@ -220,6 +224,46 @@ public class PipelineContext {
         return context != null ? context : "";
     }
     
+    /**
+     * Set RAG documents in working memory.
+     *
+     * @param docs the list of KB documents
+     */
+    public void setRagDocs(List<KbDocument> docs) {
+        put(KEY_RAG_DOCS, docs);
+    }
+
+    /**
+     * Get RAG documents from working memory.
+     *
+     * @return the list of KB documents, or empty list if not set
+     */
+    @SuppressWarnings("unchecked")
+    public List<KbDocument> getRagDocs() {
+        List<KbDocument> docs = get(KEY_RAG_DOCS);
+        return docs != null ? docs : List.of();
+    }
+
+    /**
+     * Set RAG hits (with scores) in working memory.
+     *
+     * @param hits the list of KB hits
+     */
+    public void setRagHits(List<KbHit> hits) {
+        put(KEY_RAG_HITS, hits);
+    }
+
+    /**
+     * Get RAG hits from working memory.
+     *
+     * @return the list of KB hits, or empty list if not set
+     */
+    @SuppressWarnings("unchecked")
+    public List<KbHit> getRagHits() {
+        List<KbHit> hits = get(KEY_RAG_HITS);
+        return hits != null ? hits : List.of();
+    }
+
     /**
      * Set final answer in working memory.
      *

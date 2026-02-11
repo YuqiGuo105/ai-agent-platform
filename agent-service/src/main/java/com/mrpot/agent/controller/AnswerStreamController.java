@@ -2,7 +2,9 @@ package com.mrpot.agent.controller;
 
 import com.mrpot.agent.common.api.RagAnswerRequest;
 import com.mrpot.agent.common.sse.SseEnvelope;
-import com.mrpot.agent.service.AnswerStreamOrchestrator;
+import com.mrpot.agent.service.pipeline.PipelineContext;
+import com.mrpot.agent.service.pipeline.PipelineFactory;
+import com.mrpot.agent.service.pipeline.PipelineRunner;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -20,14 +22,27 @@ import reactor.core.publisher.Flux;
 
 import java.util.UUID;
 
+/**
+ * Answer Stream Controller - provides RAG-augmented AI answer generation API.
+ * 
+ * Uses modular pipeline architecture to execute the following stages:
+ * 1. Telemetry start event
+ * 2. Conversation history retrieval
+ * 3. File extraction (conditional)
+ * 4. RAG retrieval (conditional)
+ * 5. LLM streaming response
+ * 6. Conversation save
+ * 7. Telemetry final event
+ */
 @RestController
 @RequestMapping("/answer")
 @Tag(name = "Answer Stream", description = "RAG-powered answer generation with SSE streaming")
 public class AnswerStreamController {
-  private final AnswerStreamOrchestrator orchestrator;
+  
+  private final PipelineFactory pipelineFactory;
 
-  public AnswerStreamController(AnswerStreamOrchestrator orchestrator) {
-    this.orchestrator = orchestrator;
+  public AnswerStreamController(PipelineFactory pipelineFactory) {
+    this.pipelineFactory = pipelineFactory;
   }
 
   @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -66,7 +81,14 @@ public class AnswerStreamController {
       )
       @RequestBody RagAnswerRequest request
   ) {
+    // Generate trace ID
     String traceId = UUID.randomUUID().toString();
-    return orchestrator.stream(request, traceId);
+    
+    // Create pipeline context and pipeline runner
+    PipelineContext context = pipelineFactory.createContext(request, traceId);
+    PipelineRunner pipeline = pipelineFactory.createPipeline(context);
+    
+    // Execute pipeline and return SSE event stream
+    return pipeline.run(context);
   }
 }

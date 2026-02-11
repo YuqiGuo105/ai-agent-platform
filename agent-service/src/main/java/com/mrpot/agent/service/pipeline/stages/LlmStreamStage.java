@@ -1,11 +1,13 @@
 package com.mrpot.agent.service.pipeline.stages;
 
+import com.mrpot.agent.common.kb.KbDocument;
+import com.mrpot.agent.common.kb.KbHit;
 import com.mrpot.agent.common.sse.SseEnvelope;
 import com.mrpot.agent.common.sse.StageNames;
 import com.mrpot.agent.common.tool.FileItem;
 import com.mrpot.agent.service.LlmService;
 import com.mrpot.agent.service.RagAnswerService;
-import com.mrpot.agent.service.model.ChatMessage;
+import com.mrpot.agent.model.ChatMessage;
 import com.mrpot.agent.service.pipeline.PipelineContext;
 import com.mrpot.agent.service.pipeline.Processor;
 import lombok.RequiredArgsConstructor;
@@ -14,9 +16,13 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Pipeline stage for LLM streaming.
@@ -43,13 +49,24 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
         return Mono.just(responseFlux);
     }
     
+    /** Max number of KB documents to include in the prompt. */
+    private static final int MAX_KB_DOCS = 3;
+
+    /** Minimum relevance score to include a KB doc in the prompt. */
+    private static final double MIN_RELEVANCE_SCORE = 0.3;
+
+    /** Pattern to detect answer blocks (e.g. "回答：..." or "回答:..."). */
+    private static final Pattern ANSWER_PATTERN = Pattern.compile("回答[：:](.*)", Pattern.DOTALL);
+
     /**
      * Build the prompt from pipeline context.
-     * Incorporates extracted files and RAG context.
+     * Incorporates extracted files, RAG context (top 3 relevant docs), and user question.
+     * Filters out low-relevance KB docs (score < 0.3) to avoid language contamination.
+     * Extracts answer blocks from KB docs into【QA】section.
      */
     private String buildPrompt(PipelineContext context) {
         StringBuilder prompt = new StringBuilder();
-        
+
         // Add extracted file content
         List<FileItem> files = context.getExtractedFiles();
         if (!files.isEmpty()) {
@@ -59,19 +76,55 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
                 prompt.append("\n\n");
             }
         }
-        
-        // Add RAG context
-        String ragContext = context.getRagContext();
-        if (ragContext != null && !ragContext.isBlank()) {
-            prompt.append("【Knowledge base context】\n");
-            prompt.append(ragContext);
+
+        // Process RAG documents: filter by score, limit to top 3, separate QA from KB
+        List<KbDocument> ragDocs = context.getRagDocs();
+        List<KbHit> ragHits = context.getRagHits();
+        List<String> kbEntries = new ArrayList<>();
+        List<String> qaEntries = new ArrayList<>();
+
+        int docLimit = Math.min(ragDocs.size(), MAX_KB_DOCS);
+        for (int i = 0; i < docLimit; i++) {
+            // Skip docs below relevance threshold
+            if (i < ragHits.size() && ragHits.get(i).score() < MIN_RELEVANCE_SCORE) {
+                log.debug("Skipping KB doc {} with low score {}", i, ragHits.get(i).score());
+                continue;
+            }
+
+            KbDocument doc = ragDocs.get(i);
+            String content = doc.content();
+            if (content == null || content.isBlank()) continue;
+
+            Matcher matcher = ANSWER_PATTERN.matcher(content);
+            if (matcher.find()) {
+                qaEntries.add(matcher.group(1).trim());
+            } else {
+                kbEntries.add(content.trim());
+            }
+        }
+
+        // Append【QA】section (curated answers from KB)
+        if (!qaEntries.isEmpty()) {
+            prompt.append("【QA】\n");
+            for (int i = 0; i < qaEntries.size(); i++) {
+                prompt.append("A").append(i + 1).append(": ").append(qaEntries.get(i)).append("\n");
+            }
+            prompt.append("\n");
+        }
+
+        // Append【KB】section (reference material)
+        if (!kbEntries.isEmpty()) {
+            prompt.append("【KB】\n");
+            prompt.append(String.join("\n\n", kbEntries));
             prompt.append("\n\n");
         }
-        
-        // Add user question
-        prompt.append("【User question】\n");
+
+        // Highlight user question
+        prompt.append("=== USER QUESTION (respond in this language) ===\n");
+        prompt.append("【Q】\n");
         prompt.append(context.request().question());
-        
+        prompt.append("\n===");
+
         return prompt.toString();
     }
     
@@ -87,26 +140,40 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
         return Collections.emptyList();
     }
     
+    /** Pattern to strip echoed markers from the beginning of LLM output. */
+    private static final Pattern MARKER_PATTERN = Pattern.compile("^[\\s]*【(QA|KB|Q|FILE|HIS)】[\\s]*", Pattern.MULTILINE);
+
     /**
      * Stream the LLM response using Spring AI ChatClient.
+     * Strips any echoed section markers from the output.
      */
     private Flux<SseEnvelope> streamLlmResponse(String prompt, List<ChatMessage> history, PipelineContext context) {
         StringBuilder fullAnswer = new StringBuilder();
+        AtomicBoolean leadingStripped = new AtomicBoolean(false);
         
         return llmService.streamResponse(prompt, history)
             .map(chunk -> {
-                fullAnswer.append(chunk);
+                String cleaned = chunk;
+                // Strip markers from leading chunks before real content starts
+                if (!leadingStripped.get()) {
+                    cleaned = MARKER_PATTERN.matcher(cleaned).replaceAll("");
+                    if (!cleaned.isEmpty() && !cleaned.isBlank()) {
+                        leadingStripped.set(true);
+                    }
+                }
+                fullAnswer.append(cleaned);
                 
                 return new SseEnvelope(
                     StageNames.ANSWER_DELTA,
-                    chunk,
-                    Map.of("delta", chunk),
+                    cleaned,
+                    Map.of("delta", cleaned),
                     context.nextSeq(),
                     System.currentTimeMillis(),
                     context.traceId(),
                     context.sessionId()
                 );
             })
+            .filter(envelope -> !envelope.message().isEmpty())
             .doOnComplete(() -> {
                 // Store final answer in context
                 context.setFinalAnswer(fullAnswer.toString());

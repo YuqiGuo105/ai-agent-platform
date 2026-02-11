@@ -259,14 +259,13 @@ public class RagAnswerService {
         continue;  // Skip failed extractions
       }
       
-      prompt.append("【附件#").append(count).append("】\n");
+      prompt.append("【FILE#").append(count).append("】\n");
       prompt.append("- url: ").append(file.url()).append("\n");
       prompt.append("- mime: ").append(file.mime()).append("\n");
       prompt.append("- keywords: ").append(String.join(", ", file.keywords())).append("\n");
       
       boolean truncated = file.text().length() > 40000;
-      prompt.append("- note: 抽取文本").append(truncated ? "被截断" : "完整")
-          .append("(truncated=").append(truncated).append(")\n\n");
+      prompt.append("- truncated: ").append(truncated).append("\n\n");
       
       // Add file content (limited length)
       int limit = 40000;
@@ -279,8 +278,8 @@ public class RagAnswerService {
       count++;
     }
     
-    if (count > 1) {
-      prompt.append("【问题】\n");
+    if (count > 1 && !originalQuestion.isBlank()) {
+      prompt.append("【Q】\n");
     }
     
     prompt.append(originalQuestion);

@@ -1,5 +1,6 @@
 package com.mrpot.agent.service.model;
 
+import com.mrpot.agent.model.ChatMessage;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
