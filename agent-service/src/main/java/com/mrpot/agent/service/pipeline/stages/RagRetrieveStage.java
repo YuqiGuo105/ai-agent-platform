@@ -10,6 +10,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
+import com.mrpot.agent.common.kb.KbDocument;
+import com.mrpot.agent.common.kb.KbHit;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -46,21 +51,45 @@ public class RagRetrieveStage implements Processor<Void, SseEnvelope> {
                 context.setRagDocs(response.docs());
                 context.setRagHits(response.hits());
                 
-                int hitCount = response.hits().size();
-                double topScore = response.hits().isEmpty() ? 0.0 : response.hits().get(0).score();
+                List<KbDocument> docs = response.docs();
+                List<KbHit> hits = response.hits();
+                int hitCount = hits.size();
+                double topScore = hits.isEmpty() ? 0.0 : hits.get(0).score();
                 int contextLength = ragContext != null ? ragContext.length() : 0;
                 
                 log.info("RAG retrieval complete: {} hits, topScore={}, contextLength={} for runId={}",
                     hitCount, topScore, contextLength, context.runId());
                 
-                // Create SSE envelope with RAG results
+                // Build top results preview for frontend
+                int limit = Math.min(5, docs.size());
+                List<Map<String, Object>> topResults = new ArrayList<>(limit);
+                for (int i = 0; i < limit; i++) {
+                    KbDocument doc = docs.get(i);
+                    double docScore = i < hits.size() ? hits.get(i).score() : 0.0;
+                    String content = doc.content() != null ? doc.content() : "";
+                    String preview = content.length() > 150
+                        ? content.substring(0, 150) + "..."
+                        : content;
+                    topResults.add(Map.of(
+                        "title", doc.title() != null ? doc.title() : "Untitled",
+                        "preview", preview,
+                        "score", Math.round(docScore * 100.0) / 100.0
+                    ));
+                }
+                
+                // Build display message from top result preview
+                String displayMessage = topResults.isEmpty()
+                    ? "No relevant results"
+                    : (String) topResults.get(0).get("preview");
+
+                // Create SSE envelope with RAG results and top document previews
                 return new SseEnvelope(
                     StageNames.RAG,
-                    "Knowledge base search complete",
+                    displayMessage,
                     Map.of(
-                        "hitCount", hitCount,
-                        "topScore", topScore,
-                        "contextLength", contextLength
+                        "status", "completed",
+                        "foundRelevantInfo", hitCount > 0,
+                        "topResults", topResults
                     ),
                     context.nextSeq(),
                     System.currentTimeMillis(),

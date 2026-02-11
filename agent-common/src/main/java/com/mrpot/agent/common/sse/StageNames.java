@@ -10,11 +10,11 @@ public final class StageNames {
   // New stages (safe to add - unknown stages are ignored by old frontend)
   public static final String START = "start";
   public static final String PLAN = "plan";
-  public static final String REDIS = "redis";
+  public static final String REDIS = "History";
   public static final String FILE_EXTRACT_START = "file_extract_start";
   public static final String FILE_EXTRACT = "file_extract";
   public static final String FILE_EXTRACT_DONE = "file_extract_done";
-  public static final String RAG = "rag";
+  public static final String RAG = "Searching";
   public static final String TOOL_CALL = "tool_call";
   public static final String TOOL_CALL_START = "tool_call_start";
   public static final String TOOL_CALL_RESULT = "tool_call_result";

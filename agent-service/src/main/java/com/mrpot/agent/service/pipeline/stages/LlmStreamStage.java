@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -140,8 +139,8 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
         return Collections.emptyList();
     }
     
-    /** Pattern to strip echoed markers from the beginning of LLM output. */
-    private static final Pattern MARKER_PATTERN = Pattern.compile("^[\\s]*【(QA|KB|Q|FILE|HIS)】[\\s]*", Pattern.MULTILINE);
+    /** Pattern to strip echoed markers (e.g. 【QA】, 【KB】) from LLM output. */
+    private static final Pattern MARKER_PATTERN = Pattern.compile("[\\s]*【(QA|KB|Q|FILE|HIS)】[\\s]*");
 
     /**
      * Stream the LLM response using Spring AI ChatClient.
@@ -149,18 +148,11 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
      */
     private Flux<SseEnvelope> streamLlmResponse(String prompt, List<ChatMessage> history, PipelineContext context) {
         StringBuilder fullAnswer = new StringBuilder();
-        AtomicBoolean leadingStripped = new AtomicBoolean(false);
         
         return llmService.streamResponse(prompt, history)
             .map(chunk -> {
-                String cleaned = chunk;
-                // Strip markers from leading chunks before real content starts
-                if (!leadingStripped.get()) {
-                    cleaned = MARKER_PATTERN.matcher(cleaned).replaceAll("");
-                    if (!cleaned.isEmpty() && !cleaned.isBlank()) {
-                        leadingStripped.set(true);
-                    }
-                }
+                // Strip markers from every chunk
+                String cleaned = MARKER_PATTERN.matcher(chunk).replaceAll("");
                 fullAnswer.append(cleaned);
                 
                 return new SseEnvelope(

@@ -194,11 +194,14 @@ public class RagAnswerService {
       return Flux.empty();
     }
     
-    // Start event
+    // Start event with file list
+    List<String> filenames = safeUrls.stream()
+        .map(this::filenameFromUrl)
+        .toList();
     Flux<SseEnvelope> startEvent = Flux.just(createEnvelope(
         StageNames.FILE_EXTRACT_START,
-        "File extraction starting",
-        Map.of("count", safeUrls.size(), "urls", safeUrls),
+        "Extracting uploads",
+        Map.of("fileCount", safeUrls.size(), "files", filenames),
         seq,
         traceId,
         sessionId
@@ -209,15 +212,14 @@ public class RagAnswerService {
         .flatMapMany(files -> Flux.fromIterable(files)
             .map(fileItem -> createEnvelope(
                 StageNames.FILE_EXTRACT,
-                "File extracted: " + fileItem.filename(),
+                "Extracted: " + fileItem.filename(),
                 Map.of(
                     "filename", fileItem.filename(),
-                    "mime", fileItem.mime(),
-                    "keywords", fileItem.keywords(),
-                    "excerpt", fileItem.text().length() > 100 ?
+                    "contentPreview", fileItem.text().length() > 100 ?
                         fileItem.text().substring(0, 100) + "..." :
                         fileItem.text(),
-                    "truncated", fileItem.text().length() > 100
+                    "keywords", fileItem.keywords(),
+                    "success", fileItem.isSuccess()
                 ),
                 seq,
                 traceId,
@@ -228,14 +230,15 @@ public class RagAnswerService {
     // Done event
     Flux<SseEnvelope> doneEvent = extractFilesMono(safeUrls)
         .map(files -> {
-          long used = files.stream().filter(FileItem::isSuccess).count();
+          long successfulFiles = files.stream().filter(FileItem::isSuccess).count();
+          int totalFiles = files.size();
           return createEnvelope(
               StageNames.FILE_EXTRACT_DONE,
               "File extraction complete",
               Map.of(
-                  "used", used,
-                  "files", files,
-                  "latencyMs", System.currentTimeMillis()
+                  "totalFiles", totalFiles,
+                  "successfulFiles", successfulFiles,
+                  "summary", "Extracted content from " + successfulFiles + " files"
               ),
               seq,
               traceId,

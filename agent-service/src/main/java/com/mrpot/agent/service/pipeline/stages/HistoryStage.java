@@ -10,10 +10,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
-import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Pipeline stage for retrieving conversation history from Redis.
@@ -42,20 +42,28 @@ public class HistoryStage implements Processor<Void, SseEnvelope> {
 
                 // Calculate metadata
                 int historyCount = history.size();
-                Instant oldestTimestamp = findOldestTimestamp(history);
+
+                // Extract recent user questions for frontend display
+                List<String> recentQuestions = history.stream()
+                    .filter(msg -> "user".equalsIgnoreCase(msg.role()))
+                    .map(ChatMessage::content)
+                    .collect(Collectors.toList());
 
                 log.info("Retrieved {} messages from conversation history for runId={}",
                     historyCount, context.runId());
 
+                // Build display message from recent questions
+                String displayMessage = recentQuestions.isEmpty()
+                    ? "No history"
+                    : String.join(", ", recentQuestions);
+
                 // Create SSE envelope with history retrieval result
                 return new SseEnvelope(
                     StageNames.REDIS,
-                    "Conversation history retrieved",
+                    displayMessage,
                     Map.of(
                         "historyCount", historyCount,
-                        "oldestMessageTimestamp", oldestTimestamp != null 
-                            ? oldestTimestamp.toString() 
-                            : null,
+                        "recentQuestions", recentQuestions,
                         "sessionId", sessionId
                     ),
                     context.nextSeq(),
@@ -74,7 +82,7 @@ public class HistoryStage implements Processor<Void, SseEnvelope> {
                 // Return a non-blocking error indicator
                 return Mono.just(new SseEnvelope(
                     StageNames.REDIS,
-                    "Conversation history retrieval failed (continuing without history)",
+                    "No history",
                     Map.of(
                         "historyCount", 0,
                         "error", e.getMessage() != null ? e.getMessage() : "Unknown error",
@@ -86,23 +94,5 @@ public class HistoryStage implements Processor<Void, SseEnvelope> {
                     context.sessionId()
                 ));
             });
-    }
-
-    /**
-     * Find the oldest timestamp in the conversation history.
-     *
-     * @param history list of chat messages
-     * @return the oldest timestamp, or null if history is empty
-     */
-    private Instant findOldestTimestamp(List<ChatMessage> history) {
-        if (history == null || history.isEmpty()) {
-            return null;
-        }
-
-        return history.stream()
-            .map(ChatMessage::timestamp)
-            .filter(t -> t != null)
-            .min(Instant::compareTo)
-            .orElse(null);
     }
 }
