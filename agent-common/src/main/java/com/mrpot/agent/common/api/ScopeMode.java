@@ -4,6 +4,6 @@ public enum ScopeMode {
   AUTO,
   GENERAL,
   PRIVACY_SAFE,
-  YUQI_ONLY,
+  OWNER_ONLY, 
   PRIVACY_REQUEST
 }
