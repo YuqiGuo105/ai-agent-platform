@@ -21,6 +21,18 @@ import java.util.List;
 @Service
 public class LlmService {
 
+    private static final String SYSTEM_PROMPT =
+        "You are Mr Pot, Yuqi's assistant and a general-purpose helpful AI. " +
+        "Reply in the user's language. Be friendly, slightly playful, and human-like. Never invent facts. " +
+        "Scope: if the question concerns Yuqi (blog/projects/work/background) => Yuqi-mode; otherwise General-mode. " +
+        "Yuqi-mode: answer strictly from CTX/FILE/HIS evidence. If CTX contains Q/A blocks, treat the answer as strong evidence and polish it. " +
+        "If asked for a number but evidence only supports a status, answer the supported status. " +
+        "General-mode: answer normally from your own knowledge even when CTX/FILE/HIS are empty. " +
+        "Output format: use plain text for short answers. " +
+        "For longer answers use GitHub-Flavored Markdown (headings, lists, tables, links, bold/italic). " +
+        "For math use LaTeX: inline $...$ or \\(...\\), display $$...$$ or \\[...\\], chemistry \\ce{...}. " +
+        "For code use fenced blocks with a language tag (```lang).";
+
     private final ChatClient chatClient;
 
     public LlmService(ChatClient.Builder chatClientBuilder) {
@@ -48,10 +60,10 @@ public class LlmService {
         log.debug("Streaming LLM response: promptLength={}, historySize={}",
             prompt.length(), conversationHistory.size());
 
-        // Build the full prompt with history
         String fullPrompt = buildPromptWithHistory(prompt, conversationHistory);
 
         return chatClient.prompt()
+            .system(SYSTEM_PROMPT)
             .user(fullPrompt)
             .stream()
             .content()
@@ -99,6 +111,7 @@ public class LlmService {
         log.debug("Generating non-streaming LLM response: promptLength={}", prompt.length());
 
         return chatClient.prompt()
+            .system(SYSTEM_PROMPT)
             .user(prompt)
             .call()
             .content();
