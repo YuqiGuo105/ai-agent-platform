@@ -22,6 +22,8 @@
 
     <modules>
         <module>agent-common</module>
+        <module>agent-knowledge</module>
+        <module>agent-knowledge-ui</module>
         <module>agent-service</module>
         <module>agent-tools-service</module>
         <module>agent-telemetry-service</module>
