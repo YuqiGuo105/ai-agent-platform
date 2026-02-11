@@ -1,4 +1,14 @@
+# =====================================================
+# AI Agent Platform - Docker Compose
+# Usage:
+#   docker-compose up -d                    # Start all infrastructure
+#   docker-compose --profile app up -d      # Start infrastructure + apps
+#   docker-compose down -v                  # Stop and remove volumes
+# =====================================================
+
 services:
+  # ==================== Infrastructure ====================
+
   postgres:
     image: pgvector/pgvector:pg16
     container_name: aiagent-postgres
@@ -10,20 +20,21 @@ services:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
-      # 可选：初始化脚本（启用扩展、建表）
-      # - ./initdb:/docker-entrypoint-initdb.d
+      - ./initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U aiagent -d aiagent"]
       interval: 5s
       timeout: 5s
       retries: 20
+    networks:
+      - aiagent-network
 
   redis:
-    image: redis:7.2
+    image: redis:7.2-alpine
     container_name: aiagent-redis
     ports:
       - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
       - redis_data:/data
     healthcheck:
@@ -31,16 +42,18 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+    networks:
+      - aiagent-network
 
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:3-management-alpine
     container_name: aiagent-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: aiagent
       RABBITMQ_DEFAULT_PASS: aiagent_pwd
     ports:
       - "5672:5672"
-      - "15672:15672" # management UI
+      - "15672:15672"
     volumes:
       - rabbit_data:/var/lib/rabbitmq
     healthcheck:
@@ -48,8 +61,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    networks:
+      - aiagent-network
 
-  # ===== 可选：Elasticsearch + Kibana（本地观测）=====
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     container_name: aiagent-elasticsearch
@@ -57,29 +71,171 @@ services:
       - discovery.type=single-node
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - cluster.name=aiagent-cluster
     ports:
       - "9200:9200"
+      - "9300:9300"
     volumes:
       - es_data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:9200 >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 30
+    networks:
+      - aiagent-network
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.4
     container_name: aiagent-kibana
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
     depends_on:
       elasticsearch:
         condition: service_healthy
     ports:
       - "5601:5601"
+    networks:
+      - aiagent-network
 
+  # ==================== Application Services ====================
+
+  agent-service:
+    build:
+      context: .
+      dockerfile: agent-service/Dockerfile
+    container_name: aiagent-service
+    profiles: ["app"]
+    ports:
+      - "8080:8080"
+    environment:
+      # Database
+      DB_URL: jdbc:postgresql://postgres:5432/aiagent
+      DB_USERNAME: aiagent
+      DB_PASSWORD: aiagent_pwd
+      # Redis
+      REDIS_URL: redis://redis:6379
+      # RabbitMQ
+      RABBITMQ_URL: amqp://aiagent:aiagent_pwd@rabbitmq:5672
+      RABBITMQ_USER: aiagent
+      RABBITMQ_PASS: aiagent_pwd
+      # Elasticsearch
+      ELASTIC_BASE_URL: http://elasticsearch:9200
+      ELASTIC_USERNAME: ""
+      ELASTIC_PASSWORD: ""
+      # Tools service
+      TOOLS_SERVICE_URL: http://agent-tools-service:8081
+      # AI API Keys (from .env file)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      # Java opts
+      JAVA_OPTS: "-Xms512m -Xmx1024m"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - aiagent-network
+
+  agent-tools-service:
+    build:
+      context: .
+      dockerfile: agent-tools-service/Dockerfile
+    container_name: aiagent-tools-service
+    profiles: ["app"]
+    ports:
+      - "8081:8081"
+    environment:
+      # Database
+      DB_URL: jdbc:postgresql://postgres:5432/aiagent
+      DB_USERNAME: aiagent
+      DB_PASSWORD: aiagent_pwd
+      # Agent service URL
+      AGENT_SERVICE_URL: http://agent-service:8080
+      # AI API Keys (from .env file)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      # Java opts
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - aiagent-network
+
+  agent-telemetry-service:
+    build:
+      context: .
+      dockerfile: agent-telemetry-service/Dockerfile
+    container_name: aiagent-telemetry-service
+    profiles: ["app"]
+    ports:
+      - "8082:8082"
+    environment:
+      # Database
+      DB_URL: jdbc:postgresql://postgres:5432/aiagent
+      DB_USERNAME: aiagent
+      DB_PASSWORD: aiagent_pwd
+      # RabbitMQ
+      RABBITMQ_URL: amqp://aiagent:aiagent_pwd@rabbitmq:5672
+      RABBITMQ_USER: aiagent
+      RABBITMQ_PASS: aiagent_pwd
+      # Elasticsearch
+      ELASTIC_BASE_URL: http://elasticsearch:9200
+      ELASTIC_USERNAME: ""
+      ELASTIC_PASSWORD: ""
+      # Java opts
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - aiagent-network
+
+# ==================== Networks ====================
+networks:
+  aiagent-network:
+    driver: bridge
+    name: aiagent-network
+
+# ==================== Volumes ====================
 volumes:
   pg_data:
+    name: aiagent-pg-data
   redis_data:
+    name: aiagent-redis-data
   rabbit_data:
+    name: aiagent-rabbit-data
   es_data:
+    name: aiagent-es-data
+
