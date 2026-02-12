@@ -40,6 +40,11 @@ public class PipelineContext {
     public static final String KEY_RAG_HITS = "ragHits";
     public static final String KEY_FINAL_ANSWER = "finalAnswer";
     
+    // Deep mode keys
+    public static final String KEY_DEEP_PLAN = "deepPlan";
+    public static final String KEY_DEEP_REASONING = "deepReasoning";
+    public static final String KEY_DEEP_SYNTHESIS = "deepSynthesis";
+    
     /**
      * Create a new pipeline context.
      *
@@ -281,6 +286,65 @@ public class PipelineContext {
     public String getFinalAnswer() {
         String answer = get(KEY_FINAL_ANSWER);
         return answer != null ? answer : "";
+    }
+    
+    // Deep mode helper methods
+    
+    /**
+     * Set deep plan in working memory.
+     *
+     * @param plan the deep plan map
+     */
+    public void setDeepPlan(Map<String, Object> plan) {
+        put(KEY_DEEP_PLAN, plan);
+    }
+    
+    /**
+     * Get deep plan from working memory.
+     *
+     * @return the deep plan map, or null if not set
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getDeepPlan() {
+        return get(KEY_DEEP_PLAN);
+    }
+    
+    /**
+     * Set deep reasoning result in working memory.
+     *
+     * @param reasoning the deep reasoning map
+     */
+    public void setDeepReasoning(Map<String, Object> reasoning) {
+        put(KEY_DEEP_REASONING, reasoning);
+    }
+    
+    /**
+     * Get deep reasoning result from working memory.
+     *
+     * @return the deep reasoning map, or null if not set
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getDeepReasoning() {
+        return get(KEY_DEEP_REASONING);
+    }
+    
+    /**
+     * Set deep synthesis result in working memory.
+     *
+     * @param synthesis the deep synthesis map
+     */
+    public void setDeepSynthesis(Map<String, Object> synthesis) {
+        put(KEY_DEEP_SYNTHESIS, synthesis);
+    }
+    
+    /**
+     * Get deep synthesis result from working memory.
+     *
+     * @return the deep synthesis map, or null if not set
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getDeepSynthesis() {
+        return get(KEY_DEEP_SYNTHESIS);
     }
     
     /**

@@ -11,6 +11,11 @@ public final class StageNames {
   public static final String START = "start";
   public static final String PLAN = "plan";
   public static final String REDIS = "History";
+
+  // Deep mode stages (safe to add - ignored by old frontend)
+  public static final String DEEP_PLAN = "deep_plan";
+  public static final String DEEP_REASONING = "deep_reasoning";
+  public static final String DEEP_SYNTHESIS = "deep_synthesis";
   public static final String FILE_EXTRACT_START = "file_extract_start";
   public static final String FILE_EXTRACT = "file_extract";
   public static final String FILE_EXTRACT_DONE = "file_extract_done";

@@ -34,15 +34,18 @@ public class PipelineFactory {
     private static final String DEFAULT_USER_ID = "userId_placeholder";
     
     private final FastPipeline fastPipeline;
+    private final DeepPipeline deepPipeline;
     private final PolicyBuilder policyBuilder;
     private final ModeDecider modeDecider;
     
     public PipelineFactory(
         FastPipeline fastPipeline,
+        DeepPipeline deepPipeline,
         PolicyBuilder policyBuilder,
         ModeDecider modeDecider
     ) {
         this.fastPipeline = fastPipeline;
+        this.deepPipeline = deepPipeline;
         this.policyBuilder = policyBuilder;
         this.modeDecider = modeDecider;
     }
@@ -102,8 +105,8 @@ public class PipelineFactory {
         // Use switch for future extensibility (e.g., adding DEEP, CUSTOM modes)
         return switch (mode) {
             case MODE_DEEP -> {
-                log.info("DEEP mode requested, using FAST pipeline (DEEP not implemented)");
-                yield fastPipeline.build();
+                log.info("DEEP mode requested, using DEEP pipeline");
+                yield deepPipeline.build();
             }
             case MODE_FAST -> fastPipeline.build();
             default -> {

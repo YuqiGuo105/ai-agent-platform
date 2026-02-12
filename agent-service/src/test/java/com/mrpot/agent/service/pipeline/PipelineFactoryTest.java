@@ -20,6 +20,7 @@ import static org.mockito.Mockito.*;
 class PipelineFactoryTest {
 
     private FastPipeline fastPipeline;
+    private DeepPipeline deepPipeline;
     private PolicyBuilder policyBuilder;
     private ModeDecider modeDecider;
     private PipelineFactory pipelineFactory;
@@ -30,17 +31,19 @@ class PipelineFactoryTest {
     @BeforeEach
     void setUp() {
         fastPipeline = Mockito.mock(FastPipeline.class);
+        deepPipeline = Mockito.mock(DeepPipeline.class);
         policyBuilder = Mockito.mock(PolicyBuilder.class);
         modeDecider = Mockito.mock(ModeDecider.class);
         
         mockPolicy = Mockito.mock(ExecutionPolicy.class);
         mockRunner = Mockito.mock(PipelineRunner.class);
         
-        pipelineFactory = new PipelineFactory(fastPipeline, policyBuilder, modeDecider);
+        pipelineFactory = new PipelineFactory(fastPipeline, deepPipeline, policyBuilder, modeDecider);
         
         // Default stub behavior
         when(policyBuilder.build(any())).thenReturn(mockPolicy);
         when(fastPipeline.build()).thenReturn(mockRunner);
+        when(deepPipeline.build()).thenReturn(mockRunner);
     }
 
     @Test
@@ -150,7 +153,7 @@ class PipelineFactoryTest {
     }
 
     @Test
-    void createPipeline_withDeepMode_fallbacksToFastPipeline() {
+    void createPipeline_withDeepMode_usesDeepPipeline() {
         // Arrange
         PipelineContext context = createMockContext("DEEP");
         
@@ -159,7 +162,7 @@ class PipelineFactoryTest {
         
         // Assert
         assertSame(mockRunner, result);
-        verify(fastPipeline).build();
+        verify(deepPipeline).build();
     }
 
     @Test
