@@ -3,9 +3,9 @@ spring:
     name: agent-knowledge
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/aiagent}
-    username: ${DB_USERNAME:aiagent}
-    password: ${DB_PASSWORD:aiagent_pwd}
+    url: ${DB_URL:jdbc:postgresql://centerbeam.proxy.rlwy.net:27055/railway}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:xP0_dhCBdKIyWtZlMYZx2Sdn9BXEYKj~}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -42,3 +42,18 @@ logging:
   level:
     com.mrpot.agent.knowledge: DEBUG
     org.springframework.jdbc: DEBUG
+
+# === RabbitMQ (for telemetry events) ===
+  rabbitmq:
+    addresses: ${RABBITMQ_URL:amqp://rA1koa84s5cFXUdV:SVDGsbiozPydd2YFq4MN5.o3RCsXRBra@switchyard.proxy.rlwy.net:30926}
+    username: ${RABBITMQ_USER:rA1koa84s5cFXUdV}
+    password: ${RABBITMQ_PASS:SVDGsbiozPydd2YFq4MN5.o3RCsXRBra}
+
+  # === Redis (Railway Redis instance) ===
+  data:
+    redis:
+      url: ${REDIS_URL}
+      timeout: 3000
+
+  cache:
+    type: redis

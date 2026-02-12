@@ -1,27 +1,28 @@
-import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
+import HomePage from './pages/HomePage';
 import './App.css';
 
 function App() {
-  const [knowledgeBases, setKnowledgeBases] = useState([]);
-
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Agent Knowledge Base</h1>
-        <p>Manage your AI agent knowledge bases</p>
-      </header>
-      <main className="app-main">
-        {knowledgeBases.length === 0 ? (
-          <p className="empty-state">No knowledge bases yet. Create one to get started.</p>
-        ) : (
-          <ul>
-            {knowledgeBases.map((kb) => (
-              <li key={kb.id}>{kb.name}</li>
-            ))}
-          </ul>
-        )}
-      </main>
-    </div>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <HomePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 
