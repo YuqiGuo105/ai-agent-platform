@@ -1,0 +1,2 @@
+DELETE FROM kb_documents;
+ALTER TABLE kb_documents ALTER COLUMN id RESTART WITH 1;
