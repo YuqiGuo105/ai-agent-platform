@@ -15,14 +15,15 @@ import java.util.List;
 /**
  * Service for managing conversation history in Redis.
  * Uses Redis List data structure to maintain message order.
- * Messages are stored with a TTL to prevent unbounded growth.
+ * Messages are stored with a TTL of 30 minutes - auto-expires on inactivity.
  */
 @Slf4j
 @Service
 public class ConversationHistoryService {
 
     private static final String KEY_PREFIX = "chat:history:";
-    private static final Duration DEFAULT_TTL = Duration.ofDays(7);
+    /** Session expires after 30 minutes of inactivity */
+    private static final Duration SESSION_TTL = Duration.ofMinutes(30);
     private static final int DEFAULT_HISTORY_LIMIT = 3;
     private static final int MAX_HISTORY_SIZE = 50;
 
@@ -57,8 +58,13 @@ public class ConversationHistoryService {
             .range(key, -messageCount, -1)  // Get last N messages
             .flatMap(this::deserializeMessage)
             .collectList()
+            .flatMap(messages -> 
+                // Refresh TTL on any interaction to extend session
+                redisTemplate.expire(key, SESSION_TTL)
+                    .thenReturn(messages)
+            )
             .doOnSuccess(messages -> log.debug(
-                "Retrieved {} messages from history for sessionId={}",
+                "Retrieved {} messages from history for sessionId={}, TTL refreshed",
                 messages.size(), sessionId))
             .onErrorResume(e -> {
                 log.error("Error fetching conversation history for sessionId={}: {}",
@@ -112,7 +118,7 @@ public class ConversationHistoryService {
             .flatMap(serialized -> 
                 redisTemplate.opsForList()
                     .rightPush(key, serialized)
-                    .then(redisTemplate.expire(key, DEFAULT_TTL))
+                    .then(redisTemplate.expire(key, SESSION_TTL))
                     .then(trimHistory(key))
             )
             .doOnSuccess(v -> log.debug(

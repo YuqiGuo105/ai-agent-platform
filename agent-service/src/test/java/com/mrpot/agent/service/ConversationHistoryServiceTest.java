@@ -56,6 +56,7 @@ class ConversationHistoryServiceTest {
         
         when(listOps.range(eq("chat:history:" + sessionId), anyLong(), anyLong()))
             .thenReturn(Flux.just(jsonMessage));
+        when(redisTemplate.expire(anyString(), any(Duration.class))).thenReturn(Mono.just(true));
 
         StepVerifier.create(service.getRecentHistory(sessionId, 3))
             .assertNext(messages -> {
@@ -66,6 +67,8 @@ class ConversationHistoryServiceTest {
             .verifyComplete();
 
         verify(listOps).range("chat:history:session123", -6, -1);
+        // Verify TTL is refreshed on history retrieval
+        verify(redisTemplate).expire(eq("chat:history:session123"), eq(Duration.ofMinutes(30)));
     }
 
     @Test
@@ -88,6 +91,7 @@ class ConversationHistoryServiceTest {
         
         when(listOps.range(anyString(), anyLong(), anyLong()))
             .thenReturn(Flux.just(invalidJson, validJson));
+        when(redisTemplate.expire(anyString(), any(Duration.class))).thenReturn(Mono.just(true));
 
         StepVerifier.create(service.getRecentHistory(sessionId, 3))
             .assertNext(messages -> {
@@ -133,7 +137,8 @@ class ConversationHistoryServiceTest {
 
         service.saveMessage(sessionId, "user", "test").block();
 
-        verify(redisTemplate).expire(eq("chat:history:session123"), eq(Duration.ofDays(7)));
+        // Session expires after 30 minutes of inactivity
+        verify(redisTemplate).expire(eq("chat:history:session123"), eq(Duration.ofMinutes(30)));
     }
 
     @Test

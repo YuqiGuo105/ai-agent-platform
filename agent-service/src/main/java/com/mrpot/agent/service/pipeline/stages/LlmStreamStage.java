@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 /**
@@ -54,14 +54,15 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
     /** Minimum relevance score to include a KB doc in the prompt. */
     private static final double MIN_RELEVANCE_SCORE = 0.3;
 
-    /** Pattern to detect answer blocks (e.g. "回答：..." or "回答:..."). */
-    private static final Pattern ANSWER_PATTERN = Pattern.compile("回答[：:](.*)", Pattern.DOTALL);
+    /** Pattern to normalize answer markers from RAG results. */
+    private static final Pattern ANSWER_MARKER_PATTERN = Pattern.compile("\\[回答\\]|【回答】");
 
     /**
      * Build the prompt from pipeline context.
      * Incorporates extracted files, RAG context (top 3 relevant docs), and user question.
      * Filters out low-relevance KB docs (score < 0.3) to avoid language contamination.
-     * Extracts answer blocks from KB docs into【QA】section.
+     * Preserves full RAG content (not limited to answer blocks), while normalizing
+     * any "[回答]"/"【回答】" markers to "[QA]"/"【QA】".
      */
     private String buildPrompt(PipelineContext context) {
         StringBuilder prompt = new StringBuilder();
@@ -76,11 +77,10 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
             }
         }
 
-        // Process RAG documents: filter by score, limit to top 3, separate QA from KB
+        // Process RAG documents: filter by score, limit to top 3
         List<KbDocument> ragDocs = context.getRagDocs();
         List<KbHit> ragHits = context.getRagHits();
         List<String> kbEntries = new ArrayList<>();
-        List<String> qaEntries = new ArrayList<>();
 
         int docLimit = Math.min(ragDocs.size(), MAX_KB_DOCS);
         for (int i = 0; i < docLimit; i++) {
@@ -94,21 +94,9 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
             String content = doc.content();
             if (content == null || content.isBlank()) continue;
 
-            Matcher matcher = ANSWER_PATTERN.matcher(content);
-            if (matcher.find()) {
-                qaEntries.add(matcher.group(1).trim());
-            } else {
-                kbEntries.add(content.trim());
-            }
-        }
-
-        // Append【QA】section (curated answers from KB)
-        if (!qaEntries.isEmpty()) {
-            prompt.append("【QA】\n");
-            for (int i = 0; i < qaEntries.size(); i++) {
-                prompt.append("A").append(i + 1).append(": ").append(qaEntries.get(i)).append("\n");
-            }
-            prompt.append("\n");
+            String normalizedContent = ANSWER_MARKER_PATTERN.matcher(content)
+                .replaceAll(match -> "【回答】".equals(match.group()) ? "【QA】" : "[QA]");
+            kbEntries.add(normalizedContent.trim());
         }
 
         // Append【KB】section (reference material)
@@ -139,8 +127,8 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
         return Collections.emptyList();
     }
     
-    /** Pattern to strip echoed markers (e.g. 【QA】, 【KB】) from LLM output. */
-    private static final Pattern MARKER_PATTERN = Pattern.compile("[\\s]*【(QA|KB|Q|FILE|HIS)】[\\s]*");
+    /** Pattern to strip echoed markers from the beginning of LLM output, including trailing newlines. */
+    private static final Pattern MARKER_PATTERN = Pattern.compile("^[\\s]*[【\\[](?:QA|KB|Q|FILE|HIS)[】\\]][\\s]*(?:\\r?\\n)*", Pattern.MULTILINE);
 
     /**
      * Stream the LLM response using Spring AI ChatClient.
@@ -148,11 +136,21 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
      */
     private Flux<SseEnvelope> streamLlmResponse(String prompt, List<ChatMessage> history, PipelineContext context) {
         StringBuilder fullAnswer = new StringBuilder();
+        AtomicBoolean leadingStripped = new AtomicBoolean(false);
         
-        return llmService.streamResponse(prompt, history)
+        // Pass execution mode to LlmService - FAST mode uses humorous tone
+        return llmService.streamResponse(prompt, history, context.executionMode())
             .map(chunk -> {
-                // Strip markers from every chunk
-                String cleaned = MARKER_PATTERN.matcher(chunk).replaceAll("");
+                String cleaned = chunk;
+                // Strip markers and leading whitespace from chunks before real content starts
+                if (!leadingStripped.get()) {
+                    cleaned = MARKER_PATTERN.matcher(cleaned).replaceAll("");
+                    // Also strip any leading whitespace/newlines until real content appears
+                    cleaned = cleaned.replaceFirst("^[\\s\\n\\r]*", "");
+                    if (!cleaned.isEmpty()) {
+                        leadingStripped.set(true);
+                    }
+                }
                 fullAnswer.append(cleaned);
                 
                 return new SseEnvelope(
@@ -167,10 +165,13 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
             })
             .filter(envelope -> !envelope.message().isEmpty())
             .doOnComplete(() -> {
-                // Store final answer in context
-                context.setFinalAnswer(fullAnswer.toString());
+                // Store final answer in context, stripping any remaining markers
+                String finalAnswer = fullAnswer.toString();
+                finalAnswer = MARKER_PATTERN.matcher(finalAnswer).replaceAll("");
+                finalAnswer = finalAnswer.replaceFirst("^[\\s\\n\\r]+", "");
+                context.setFinalAnswer(finalAnswer);
                 log.debug("LLM streaming complete: answerLength={} for runId={}",
-                    fullAnswer.length(), context.runId());
+                    finalAnswer.length(), context.runId());
             })
             .onErrorResume(e -> {
                 log.error("LLM service error, falling back to simulated response: {}", e.getMessage());
