@@ -3,6 +3,10 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
+import RunLogsDashboard from './pages/telemetry/RunLogsDashboard';
+import RunDetailView from './pages/telemetry/RunDetailView';
+import DlqMonitor from './pages/telemetry/DlqMonitor';
+import EventStreamMonitor from './pages/telemetry/EventStreamMonitor';
 import './App.css';
 
 function App() {
@@ -16,6 +20,38 @@ function App() {
             element={
               <ProtectedRoute>
                 <HomePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/telemetry"
+            element={
+              <ProtectedRoute>
+                <RunLogsDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/telemetry/runs/:runId"
+            element={
+              <ProtectedRoute>
+                <RunDetailView />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/telemetry/dlq"
+            element={
+              <ProtectedRoute>
+                <DlqMonitor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/telemetry/events"
+            element={
+              <ProtectedRoute>
+                <EventStreamMonitor />
               </ProtectedRoute>
             }
           />

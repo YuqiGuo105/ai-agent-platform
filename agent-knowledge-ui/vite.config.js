@@ -13,6 +13,11 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
+      '/telemetry-api': {
+        target: 'http://localhost:8082',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/telemetry-api/, '/api'),
+      },
     },
   },
   test: {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../axios';
 import { useAuth } from '../contexts/AuthContext';
 import './HomePage.css';
@@ -12,6 +13,7 @@ export default function HomePage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [expandedRows, setExpandedRows] = useState([]);
+  const [jumpPage, setJumpPage] = useState('');
   // Fetch KB documents from backend
   useEffect(() => {
     async function fetchDocuments() {
@@ -114,6 +116,13 @@ export default function HomePage() {
           >
             {getInitials(user?.displayName, user?.email)}
           </span>
+          <Link
+            to="/telemetry"
+            className="btn-logs"
+            title="View Run Logs"
+          >
+            📊 Run Logs
+          </Link>
           <button className="btn-logout" onClick={logout}>
             Sign Out
           </button>
@@ -195,6 +204,39 @@ export default function HomePage() {
                 <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}>&lt; Prev</button>
                 <span>Page {page} of {totalPages}</span>
                 <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}>Next &gt;</button>
+                <span className="kb-jump-page">
+                  跳转
+                  <input
+                    type="number"
+                    min="1"
+                    max={totalPages}
+                    value={jumpPage}
+                    placeholder={String(page)}
+                    onChange={(e) => setJumpPage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = parseInt(jumpPage, 10);
+                        if (val >= 1 && val <= totalPages) {
+                          setPage(val);
+                          setJumpPage('');
+                        }
+                      }
+                    }}
+                  />
+                  页
+                  <button
+                    onClick={() => {
+                      const val = parseInt(jumpPage, 10);
+                      if (val >= 1 && val <= totalPages) {
+                        setPage(val);
+                        setJumpPage('');
+                      }
+                    }}
+                    disabled={!jumpPage || parseInt(jumpPage, 10) < 1 || parseInt(jumpPage, 10) > totalPages}
+                  >
+                    Go
+                  </button>
+                </span>
               </div>
             </div>
           )}
