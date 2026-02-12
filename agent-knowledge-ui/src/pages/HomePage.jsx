@@ -1,10 +1,58 @@
 import { useState, useEffect } from 'react';
+import api from '../axios';
 import { useAuth } from '../contexts/AuthContext';
 import './HomePage.css';
 
 export default function HomePage() {
   const { user, logout } = useAuth();
   const [knowledgeBases, setKnowledgeBases] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [expandedRows, setExpandedRows] = useState([]);
+  // Fetch KB documents from backend
+  useEffect(() => {
+    async function fetchDocuments() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await api.get('/kb/documents');
+        setKnowledgeBases(res.data);
+      } catch (err) {
+        setError('Failed to fetch knowledge bases');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchDocuments();
+  }, []);
+
+  // Search and pagination logic
+  const filtered = knowledgeBases.filter(kb =>
+    (kb.docType || '').toLowerCase().includes(search.toLowerCase()) ||
+    (kb.content || '').toLowerCase().includes(search.toLowerCase())
+  );
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  function handleExpandRow(idx) {
+    setExpandedRows((prev) =>
+      prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
+    );
+  }
+
+  // Delete KB document by id
+  async function handleDelete(id) {
+    if (!window.confirm('Delete this document?')) return;
+    try {
+      await api.delete(`/kb/documents/${id}`);
+      setKnowledgeBases((prev) => prev.filter((kb) => kb.id !== id));
+    } catch (err) {
+      alert('Failed to delete document');
+    }
+  }
 
   // Helper to get avatar URL with Google size param if needed
   function getAvatarUrl(url) {
@@ -80,21 +128,75 @@ export default function HomePage() {
 
         <section className="kb-section">
           <div className="kb-header">
-            <h3>Knowledge Bases</h3>
+            <h3>Knowledge Base Documents</h3>
           </div>
-
-          {knowledgeBases.length === 0 ? (
+          <div className="kb-search-bar">
+            <input
+              type="text"
+              placeholder="Search type or content..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              className="kb-search-input"
+            />
+          </div>
+          {loading ? (
+            <div className="empty-state"><p>Loading...</p></div>
+          ) : error ? (
+            <div className="empty-state"><p style={{color: 'red'}}>{error}</p></div>
+          ) : knowledgeBases.length === 0 ? (
             <div className="empty-state">
               <p>No knowledge bases yet. Create one to get started.</p>
             </div>
+          ) : paged.length === 0 ? (
+            <div className="empty-state">
+              <p>No results found.</p>
+            </div>
           ) : (
-            <ul className="kb-list">
-              {knowledgeBases.map((kb) => (
-                <li key={kb.id} className="kb-card">
-                  <span>{kb.name}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="kb-table-wrapper small-table">
+              <table className="kb-table">
+                <thead>
+                  <tr>
+                    <th style={{width: '30%'}}>Type</th>
+                    <th style={{width: '50%'}}>Content</th>
+                    <th style={{width: '20%'}}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paged.map((kb, idx) => (
+                    <tr key={kb.id}>
+                      <td>{kb.docType || kb.type || '-'}</td>
+                      <td style={{maxWidth: 180, position: 'relative'}}>
+                        <div
+                          className={`kb-content-cell${expandedRows.includes(idx + (page-1)*pageSize) ? ' expanded' : ''}`}
+                          style={{
+                            maxHeight: expandedRows.includes(idx + (page-1)*pageSize) ? 'none' : '2.5em',
+                            overflow: expandedRows.includes(idx + (page-1)*pageSize) ? 'visible' : 'hidden',
+                            cursor: 'pointer',
+                            whiteSpace: expandedRows.includes(idx + (page-1)*pageSize) ? 'pre-line' : 'nowrap',
+                            textOverflow: expandedRows.includes(idx + (page-1)*pageSize) ? 'unset' : 'ellipsis',
+                          }}
+                          title={kb.content}
+                          onClick={() => handleExpandRow(idx + (page-1)*pageSize)}
+                        >
+                          {kb.content || '-'}
+                        </div>
+                        {!expandedRows.includes(idx + (page-1)*pageSize) && kb.content && kb.content.length > 60 && (
+                          <span className="kb-expand-hint">▼</span>
+                        )}
+                      </td>
+                      <td>
+                        <button className="btn-delete" onClick={() => handleDelete(kb.id)} title="Delete">🗑️</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="kb-pagination">
+                <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}>&lt; Prev</button>
+                <span>Page {page} of {totalPages}</span>
+                <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}>Next &gt;</button>
+              </div>
+            </div>
           )}
         </section>
       </main>

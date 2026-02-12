@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import LoginPage from '../pages/LoginPage';
 import HomePage from '../pages/HomePage';
+import * as axiosModule from '../axios';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 const renderWithAuth = (ui, { user = null, loading = false, ...authOverrides } = {}, { route = '/' } = {}) => {
@@ -52,9 +53,10 @@ describe('HomePage', () => {
     expect(screen.getByText(/Test User/)).toBeInTheDocument();
   });
 
-  it('shows empty state for knowledge bases', () => {
+  it('shows empty state for knowledge bases', async () => {
+    vi.spyOn(axiosModule.default, 'get').mockResolvedValueOnce({ data: [] });
     renderWithAuth(<HomePage />, { user: mockUser });
-    expect(screen.getByText(/No knowledge bases yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/No knowledge bases yet/)).toBeInTheDocument();
   });
 
   it('renders sign out button', () => {

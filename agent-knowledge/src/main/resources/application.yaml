@@ -2,9 +2,6 @@ spring:
   application:
     name: agent-knowledge
 
-cors:
-  allowed-origins: "*"
-
   datasource:
     url: ${DB_URL:jdbc:postgresql://centerbeam.proxy.rlwy.net:27055/railway}
     username: ${DB_USERNAME:postgres}
