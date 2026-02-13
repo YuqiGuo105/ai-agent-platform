@@ -10,8 +10,11 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [docTypeFilter, setDocTypeFilter] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [expandedRows, setExpandedRows] = useState([]);
   const [jumpPage, setJumpPage] = useState('');
   // Fetch KB documents from backend
@@ -20,8 +23,30 @@ export default function HomePage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await api.get('/kb/documents');
-        setKnowledgeBases(res.data);
+        const params = {
+          page: page - 1,
+          size: pageSize,
+        };
+        if (search.trim()) {
+          params.keyword = search.trim();
+        }
+        if (docTypeFilter.trim()) {
+          params.docType = docTypeFilter.trim();
+        }
+
+        const res = await api.get('/kb/documents/search', { params });
+        const payload = res.data;
+
+        // Backward compatibility with older backend response format
+        if (Array.isArray(payload)) {
+          setKnowledgeBases(payload);
+          setTotalElements(payload.length);
+          setTotalPages(Math.ceil(payload.length / pageSize));
+        } else {
+          setKnowledgeBases(payload.content || []);
+          setTotalElements(payload.totalElements || 0);
+          setTotalPages(payload.totalPages || 0);
+        }
       } catch (err) {
         setError('Failed to fetch knowledge bases');
       } finally {
@@ -29,15 +54,13 @@ export default function HomePage() {
       }
     }
     fetchDocuments();
-  }, []);
+  }, [page, pageSize, search, docTypeFilter]);
 
-  // Search and pagination logic
-  const filtered = knowledgeBases.filter(kb =>
-    (kb.docType || '').toLowerCase().includes(search.toLowerCase()) ||
-    (kb.content || '').toLowerCase().includes(search.toLowerCase())
-  );
-  const totalPages = Math.ceil(filtered.length / pageSize);
-  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   function handleExpandRow(idx) {
     setExpandedRows((prev) =>
@@ -51,6 +74,7 @@ export default function HomePage() {
     try {
       await api.delete(`/kb/documents/${id}`);
       setKnowledgeBases((prev) => prev.filter((kb) => kb.id !== id));
+      setTotalElements((prev) => Math.max(0, prev - 1));
     } catch (err) {
       alert('Failed to delete document');
     }
@@ -142,9 +166,16 @@ export default function HomePage() {
           <div className="kb-search-bar">
             <input
               type="text"
-              placeholder="Search type or content..."
+              placeholder="Search content/type/metadata..."
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
+              className="kb-search-input"
+            />
+            <input
+              type="text"
+              placeholder="Filter doc type (optional)..."
+              value={docTypeFilter}
+              onChange={e => { setDocTypeFilter(e.target.value); setPage(1); }}
               className="kb-search-input"
             />
           </div>
@@ -154,11 +185,7 @@ export default function HomePage() {
             <div className="empty-state"><p style={{color: 'red'}}>{error}</p></div>
           ) : knowledgeBases.length === 0 ? (
             <div className="empty-state">
-              <p>No knowledge bases yet. Create one to get started.</p>
-            </div>
-          ) : paged.length === 0 ? (
-            <div className="empty-state">
-              <p>No results found.</p>
+              <p>{search.trim() || docTypeFilter.trim() ? 'No results found.' : 'No knowledge bases yet. Create one to get started.'}</p>
             </div>
           ) : (
             <div className="kb-table-wrapper small-table">
@@ -171,7 +198,7 @@ export default function HomePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paged.map((kb, idx) => (
+                  {knowledgeBases.map((kb, idx) => (
                     <tr key={kb.id}>
                       <td>{kb.docType || kb.type || '-'}</td>
                       <td style={{maxWidth: 180, position: 'relative'}}>
@@ -202,8 +229,13 @@ export default function HomePage() {
               </table>
               <div className="kb-pagination">
                 <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}>&lt; Prev</button>
-                <span>Page {page} of {totalPages}</span>
-                <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}>Next &gt;</button>
+                <span>Page {Math.min(page, Math.max(totalPages, 1))} of {Math.max(totalPages, 1)} ({totalElements} total)</span>
+                <button
+                  onClick={() => setPage(p => Math.min(Math.max(totalPages, 1), p + 1))}
+                  disabled={totalPages <= 1 || page >= totalPages}
+                >
+                  Next &gt;
+                </button>
                 <span className="kb-jump-page">
                   跳转
                   <input
