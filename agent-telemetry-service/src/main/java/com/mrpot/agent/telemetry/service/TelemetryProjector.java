@@ -146,6 +146,16 @@ public class TelemetryProjector {
             run.setModel(e.model());
             run.setQuestion(trunc((String) e.data().getOrDefault("question", ""), 3800));
             run.setStatus("RUNNING");
+
+            Object parentRunId = e.data().get("parentRunId");
+            if (parentRunId instanceof String pid && !pid.isBlank()) {
+                run.setParentRunId(pid);
+            }
+            Object replayMode = e.data().get("replayMode");
+            if (replayMode instanceof String rm && !rm.isBlank()) {
+                run.setReplayMode(rm);
+            }
+
             runRepo.save(run);
             
             // Add to ES outbox
@@ -177,6 +187,12 @@ public class TelemetryProjector {
                 run.setAnswerFinal(trunc((String) e.data().getOrDefault("answerFinal", ""), 11000));
                 run.setTotalLatencyMs(toLong(e.data().get("totalLatencyMs"), 0L));
                 run.setStatus("DONE");
+
+                Object parentRunId = e.data().get("parentRunId");
+                if (parentRunId instanceof String pid && !pid.isBlank() && run.getParentRunId() == null) {
+                    run.setParentRunId(pid);
+                }
+
                 runRepo.save(run);
                 
                 // Update ES outbox

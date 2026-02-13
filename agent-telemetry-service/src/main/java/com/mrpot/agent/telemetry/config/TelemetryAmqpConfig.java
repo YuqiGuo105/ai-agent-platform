@@ -19,7 +19,7 @@ public class TelemetryAmqpConfig {
 
     public static final String TELEMETRY_EXCHANGE = "mrpot.telemetry.x";
     public static final String TELEMETRY_QUEUE = "mrpot.telemetry.q";
-    public static final String TELEMETRY_DLQ = "mrpot.telemetry.dlq";
+    public static final String TELEMETRY_DLQ = "telemetry.dlq";
     public static final String ROUTING_KEY = "telemetry.#";
 
     /**
@@ -59,7 +59,7 @@ public class TelemetryAmqpConfig {
     @Bean
     public Queue telemetryQueue() {
         return QueueBuilder.durable(TELEMETRY_QUEUE)
-                .withArgument("x-dead-letter-exchange", "")
+                .withArgument("x-dead-letter-exchange", TELEMETRY_EXCHANGE)
                 .withArgument("x-dead-letter-routing-key", TELEMETRY_DLQ)
                 .build();
     }

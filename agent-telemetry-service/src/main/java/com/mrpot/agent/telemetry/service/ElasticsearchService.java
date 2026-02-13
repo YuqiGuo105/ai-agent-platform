@@ -236,7 +236,9 @@ public class ElasticsearchService {
               "kbLatencyMs": { "type": "long" },
               "totalLatencyMs": { "type": "long" },
               "status": { "type": "keyword" },
-              "errorCode": { "type": "keyword" }
+              "errorCode": { "type": "keyword" },
+              "parentRunId": { "type": "keyword" },
+              "replayMode": { "type": "keyword" }
             }
           }
         }

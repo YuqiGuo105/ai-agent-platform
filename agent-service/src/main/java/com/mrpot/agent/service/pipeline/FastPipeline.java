@@ -1,5 +1,6 @@
 package com.mrpot.agent.service.pipeline;
 
+import com.mrpot.agent.common.replay.ReplayMode;
 import com.mrpot.agent.service.ConversationHistoryService;
 import com.mrpot.agent.service.KbRetrievalService;
 import com.mrpot.agent.service.LlmService;
@@ -91,12 +92,14 @@ public class FastPipeline {
         
         // Stage 2: File extraction
         // Condition: policy allows file access AND request has file URLs
+        // In LLM_ONLY replay mode, skip file extraction (tool stage)
         runner.addStage(
             "file_extract",
             new FileExtractStage(ragAnswerService),
             StageConfig.of(
                 Duration.ofSeconds(30),  
-                ctx -> ctx.policy().allowFile() && 
+                ctx -> ctx.getReplayMode() != ReplayMode.LLM_ONLY &&
+                       ctx.policy().allowFile() && 
                        !ctx.request().resolveFileUrls(3).isEmpty()
             )
         );

@@ -3,6 +3,8 @@ package com.mrpot.agent.service.pipeline;
 import com.mrpot.agent.common.api.RagAnswerRequest;
 import com.mrpot.agent.common.api.ScopeMode;
 import com.mrpot.agent.common.policy.ExecutionPolicy;
+import com.mrpot.agent.common.replay.ReplayCommand;
+import com.mrpot.agent.common.replay.ReplayMode;
 import com.mrpot.agent.service.policy.ModeDecider;
 import com.mrpot.agent.service.policy.PolicyBuilder;
 import lombok.extern.slf4j.Slf4j;
@@ -114,6 +116,47 @@ public class PipelineFactory {
                 yield fastPipeline.build();
             }
         };
+    }
+    
+    /**
+     * Create a replay pipeline context from a ReplayCommand.
+     *
+     * @param command the replay command containing parent run info and replay mode
+     * @return pipeline context configured for replay
+     */
+    public PipelineContext createReplayContext(ReplayCommand command) {
+        String traceId = UUID.randomUUID().toString();
+        
+        ExecutionPolicy policy = policyBuilder.build(ScopeMode.GENERAL);
+        
+        String executionMode = command.getMode() == ReplayMode.LLM_ONLY ? MODE_FAST : MODE_DEEP;
+        
+        log.info("Creating replay context: newRunId={}, parentRunId={}, replayMode={}, executionMode={}",
+            command.getNewRunId(), command.getParentRunId(), command.getMode(), executionMode);
+        
+        return PipelineContext.builder()
+            .runId(command.getNewRunId())
+            .traceId(traceId)
+            .sessionId(command.getSessionId())
+            .userId(command.getUserId() != null ? command.getUserId() : DEFAULT_USER_ID)
+            .request(new RagAnswerRequest(
+                command.getQuestion(),
+                command.getSessionId(),
+                command.getModel(),
+                null,
+                ScopeMode.GENERAL,
+                null,
+                executionMode,
+                null,
+                null
+            ))
+            .scopeMode(ScopeMode.GENERAL)
+            .policy(policy)
+            .executionMode(executionMode)
+            .parentRunId(command.getParentRunId())
+            .replayMode(command.getMode())
+            .allowedTools(command.getAllowedTools())
+            .build();
     }
     
     /**

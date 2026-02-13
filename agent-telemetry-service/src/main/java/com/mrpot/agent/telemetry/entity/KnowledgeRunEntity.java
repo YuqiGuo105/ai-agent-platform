@@ -38,4 +38,10 @@ public class KnowledgeRunEntity {
 
     private String status;   // RUNNING/DONE/FAILED/CANCELLED
     private String errorCode;
+
+    @Column(length = 36)
+    private String parentRunId;
+
+    @Column(length = 20)
+    private String replayMode;
 }
