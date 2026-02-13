@@ -12,15 +12,19 @@ WORKDIR /build
 # Install Maven
 RUN apk add --no-cache maven
 
-# Copy parent pom and module poms first (for better layer caching)
+# Copy parent pom and ALL module poms first (for better layer caching)
 COPY pom.xml ./pom.xml
 COPY agent-common/pom.xml ./agent-common/pom.xml
+COPY agent-service/pom.xml ./agent-service/pom.xml
+COPY agent-tools-service/pom.xml ./agent-tools-service/pom.xml
 COPY agent-telemetry-service/pom.xml ./agent-telemetry-service/pom.xml
+COPY agent-knowledge/pom.xml ./agent-knowledge/pom.xml
+COPY agent-knowledge-ui/pom.xml ./agent-knowledge-ui/pom.xml
 
 # Download dependencies (cached unless pom changes)
 RUN mvn dependency:go-offline -pl agent-telemetry-service -am -q || true
 
-# Copy source code
+# Copy source code for this module and its dependencies
 COPY agent-common/src ./agent-common/src
 COPY agent-telemetry-service/src ./agent-telemetry-service/src
 

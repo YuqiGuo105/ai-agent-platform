@@ -1,0 +1,122 @@
+# =====================================================
+# AI Agent Platform - Production Docker Compose
+# Uses remote infrastructure (Railway PostgreSQL, RabbitMQ, Redis, Elasticsearch)
+# 
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up -d
+#   docker-compose -f docker-compose.prod.yml down
+# =====================================================
+
+services:
+  agent-service:
+    image: yuqiguo/agent-service:latest
+    container_name: aiagent-service
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      # Override service URLs for container networking
+      TOOLS_SERVICE_URL: http://agent-tools-service:8081
+      JAVA_OPTS: "-Xms512m -Xmx1024m"
+      SPRING_PROFILES_ACTIVE: docker
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - aiagent-network
+    depends_on:
+      - agent-tools-service
+
+  agent-tools-service:
+    image: yuqiguo/agent-tools-service:latest
+    container_name: aiagent-tools-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    environment:
+      AGENT_SERVICE_URL: http://agent-service:8080
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+      SPRING_PROFILES_ACTIVE: docker
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - aiagent-network
+
+  agent-telemetry-service:
+    image: yuqiguo/agent-telemetry-service:latest
+    container_name: aiagent-telemetry-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    env_file:
+      - .env
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+      SPRING_PROFILES_ACTIVE: docker
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - aiagent-network
+
+  agent-knowledge:
+    image: yuqiguo/agent-knowledge:latest
+    container_name: aiagent-knowledge
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    env_file:
+      - .env
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+      SPRING_PROFILES_ACTIVE: docker
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - aiagent-network
+
+  agent-knowledge-ui:
+    image: yuqiguo/agent-knowledge-ui:latest
+    container_name: aiagent-knowledge-ui
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      # Runtime environment (nginx proxies to backend services)
+      VITE_API_BASE_URL: /api
+      VITE_TELEMETRY_API_BASE_URL: /telemetry-api
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    networks:
+      - aiagent-network
+    depends_on:
+      - agent-service
+      - agent-telemetry-service
+      - agent-knowledge
+
+networks:
+  aiagent-network:
+    driver: bridge
+    name: aiagent-network
