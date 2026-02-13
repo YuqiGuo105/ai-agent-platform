@@ -151,14 +151,21 @@ public class DeepSynthesisStage implements Processor<Void, SseEnvelope> {
             return DEFAULT_DEEP_ANSWER;
         }
         
-        // Try to extract final hypothesis or answer
+        // Try to extract hypothesis (key from DeepReasoningStage)
+        Object hypothesis = reasoning.get("hypothesis");
+        if (hypothesis != null && !hypothesis.toString().isBlank()) {
+            return hypothesis.toString();
+        }
+        
+        // Fallback: try finalHypothesis
         Object finalHypothesis = reasoning.get("finalHypothesis");
-        if (finalHypothesis != null) {
+        if (finalHypothesis != null && !finalHypothesis.toString().isBlank()) {
             return finalHypothesis.toString();
         }
         
+        // Fallback: try summary
         Object summary = reasoning.get("summary");
-        if (summary != null) {
+        if (summary != null && !summary.toString().isBlank()) {
             return summary.toString();
         }
         

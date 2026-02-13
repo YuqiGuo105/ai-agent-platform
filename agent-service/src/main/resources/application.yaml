@@ -166,3 +166,7 @@ deep:
   reasoning-timeout-seconds: 120  # Total timeout for reasoning phase
   confidence-threshold: 0.85      # Confidence threshold to stop early
   plan-timeout-seconds: 30        # Timeout for plan generation
+  # Multi-signal scoring configuration (Sprint 6)
+  complexity-threshold: 0.6       # Complexity threshold for automatic DEEP mode (0.0-1.0)
+  max-tool-rounds-cap: 10         # Maximum tool call rounds cap
+  tool-timeout-seconds: 30        # Timeout for individual tool calls

@@ -60,6 +60,13 @@ public class PipelineContext {
     public static final String KEY_SYNTHESIS_BLOCKS = "synthesisBlocks";
     public static final String KEY_CURRENT_ROUND = "currentRound";
     
+    // Complexity scoring keys (Sprint 6)
+    public static final String KEY_COMPLEXITY_SCORE = "complexityScore";
+    public static final String KEY_FEATURE_BREAKDOWN = "featureBreakdown";
+    public static final String KEY_DEEP_ROUNDS_USED = "deepRoundsUsed";
+    public static final String KEY_TOOL_CALLS_COUNT = "toolCallsCount";
+    public static final String KEY_TOOL_SUCCESS_COUNT = "toolSuccessCount";
+    
     /**
      * Create a new pipeline context.
      *
@@ -455,6 +462,118 @@ public class PipelineContext {
      */
     public int getCurrentRound() {
         return getOrDefault(KEY_CURRENT_ROUND, 0);
+    }
+    
+    // Complexity scoring helper methods (Sprint 6)
+    
+    /**
+     * Set complexity score in working memory.
+     *
+     * @param score the complexity score (0.0-1.0)
+     */
+    public void setComplexityScore(double score) {
+        put(KEY_COMPLEXITY_SCORE, score);
+    }
+    
+    /**
+     * Get complexity score from working memory.
+     *
+     * @return the complexity score, or 0.0 if not set
+     */
+    public double getComplexityScore() {
+        Double score = get(KEY_COMPLEXITY_SCORE);
+        return score != null ? score : 0.0;
+    }
+    
+    /**
+     * Set feature breakdown map in working memory.
+     *
+     * @param breakdown the feature breakdown map
+     */
+    public void setFeatureBreakdown(Map<String, Double> breakdown) {
+        put(KEY_FEATURE_BREAKDOWN, breakdown);
+    }
+    
+    /**
+     * Get feature breakdown from working memory.
+     *
+     * @return the feature breakdown map, or empty map if not set
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Double> getFeatureBreakdown() {
+        Map<String, Double> breakdown = get(KEY_FEATURE_BREAKDOWN);
+        return breakdown != null ? breakdown : Map.of();
+    }
+    
+    /**
+     * Set deep rounds used count.
+     *
+     * @param rounds the number of deep rounds used
+     */
+    public void setDeepRoundsUsed(int rounds) {
+        put(KEY_DEEP_ROUNDS_USED, rounds);
+    }
+    
+    /**
+     * Get deep rounds used count.
+     *
+     * @return the number of deep rounds used, 0 by default
+     */
+    public int getDeepRoundsUsed() {
+        return getOrDefault(KEY_DEEP_ROUNDS_USED, 0);
+    }
+    
+    /**
+     * Increment and get tool call count.
+     *
+     * @return the new tool call count
+     */
+    public int incrementToolCallCount() {
+        int count = getOrDefault(KEY_TOOL_CALLS_COUNT, 0) + 1;
+        put(KEY_TOOL_CALLS_COUNT, count);
+        return count;
+    }
+    
+    /**
+     * Get tool call count.
+     *
+     * @return the tool call count, 0 by default
+     */
+    public int getToolCallsCount() {
+        return getOrDefault(KEY_TOOL_CALLS_COUNT, 0);
+    }
+    
+    /**
+     * Increment and get tool success count.
+     *
+     * @return the new tool success count
+     */
+    public int incrementToolSuccessCount() {
+        int count = getOrDefault(KEY_TOOL_SUCCESS_COUNT, 0) + 1;
+        put(KEY_TOOL_SUCCESS_COUNT, count);
+        return count;
+    }
+    
+    /**
+     * Get tool success count.
+     *
+     * @return the tool success count, 0 by default
+     */
+    public int getToolSuccessCount() {
+        return getOrDefault(KEY_TOOL_SUCCESS_COUNT, 0);
+    }
+    
+    /**
+     * Calculate tool success rate.
+     *
+     * @return the tool success rate (0.0-1.0), or 1.0 if no tools called
+     */
+    public double getToolSuccessRate() {
+        int total = getToolCallsCount();
+        if (total == 0) {
+            return 1.0;
+        }
+        return (double) getToolSuccessCount() / total;
     }
     
     /**

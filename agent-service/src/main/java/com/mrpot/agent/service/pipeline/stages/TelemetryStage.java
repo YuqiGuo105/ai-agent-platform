@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -123,26 +124,65 @@ public class TelemetryStage implements Processor<Void, SseEnvelope> {
     }
     
     /**
-     * Create START event data
+     * Create START event data.
+     * Includes complexity score, execution mode, and feature breakdown.
      */
     private Map<String, Object> createStartData(PipelineContext context) {
         String question = context.request().question();
-        return Map.of(
-            "question", truncate(question, MAX_QUESTION_LENGTH)
-        );
+        Map<String, Object> data = new HashMap<>();
+        
+        // Basic fields
+        data.put("question", truncate(question, MAX_QUESTION_LENGTH));
+        data.put("executionMode", context.executionMode());
+        
+        // Complexity scoring fields (Sprint 6)
+        double complexityScore = context.getComplexityScore();
+        if (complexityScore > 0) {
+            data.put("complexityScore", complexityScore);
+        }
+        
+        Map<String, Double> breakdown = context.getFeatureBreakdown();
+        if (!breakdown.isEmpty()) {
+            data.put("featureBreakdown", breakdown);
+        }
+        
+        return data;
     }
     
     /**
-     * Create FINAL event data
+     * Create FINAL event data.
+     * Includes latency, deep rounds used, tool call metrics.
      */
     private Map<String, Object> createFinalData(PipelineContext context) {
         String answer = context.getFinalAnswer();
         long totalLatencyMs = context.elapsedMs();
         
-        return Map.of(
-            "answerFinal", truncate(answer, MAX_ANSWER_LENGTH),
-            "totalLatencyMs", totalLatencyMs
-        );
+        Map<String, Object> data = new HashMap<>();
+        
+        // Basic fields
+        data.put("answerFinal", truncate(answer, MAX_ANSWER_LENGTH));
+        data.put("totalLatencyMs", totalLatencyMs);
+        data.put("executionMode", context.executionMode());
+        
+        // Deep mode metrics (Sprint 6)
+        if ("DEEP".equals(context.executionMode())) {
+            data.put("deepRoundsUsed", context.getDeepRoundsUsed());
+        }
+        
+        // Tool call metrics (Sprint 6)
+        int toolCallsCount = context.getToolCallsCount();
+        if (toolCallsCount > 0) {
+            data.put("toolCallsCount", toolCallsCount);
+            data.put("toolSuccessRate", context.getToolSuccessRate());
+        }
+        
+        // Complexity score (for correlation analysis)
+        double complexityScore = context.getComplexityScore();
+        if (complexityScore > 0) {
+            data.put("complexityScore", complexityScore);
+        }
+        
+        return data;
     }
     
     /**
