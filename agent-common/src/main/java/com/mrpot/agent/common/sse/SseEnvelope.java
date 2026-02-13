@@ -26,4 +26,60 @@ public record SseEnvelope(
     
     @Schema(description = "Session ID", example = "sess-12345")
     String sessionId
-) {}
+) {
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static final class Builder {
+    private String stage;
+    private String message;
+    private Object payload;
+    private Long seq;
+    private Long ts;
+    private String traceId;
+    private String sessionId;
+
+    private Builder() {}
+
+    public Builder stage(String stage) {
+      this.stage = stage;
+      return this;
+    }
+
+    public Builder message(String message) {
+      this.message = message;
+      return this;
+    }
+
+    public Builder payload(Object payload) {
+      this.payload = payload;
+      return this;
+    }
+
+    public Builder seq(long seq) {
+      this.seq = seq;
+      return this;
+    }
+
+    public Builder ts(long ts) {
+      this.ts = ts;
+      return this;
+    }
+
+    public Builder traceId(String traceId) {
+      this.traceId = traceId;
+      return this;
+    }
+
+    public Builder sessionId(String sessionId) {
+      this.sessionId = sessionId;
+      return this;
+    }
+
+    public SseEnvelope build() {
+      return new SseEnvelope(stage, message, payload, seq, ts, traceId, sessionId);
+    }
+  }
+}

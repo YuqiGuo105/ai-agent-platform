@@ -9,6 +9,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mrpot.agent.common.tool.FileUnderstanding;
 import com.mrpot.agent.common.tool.mcp.CallToolRequest;
 import com.mrpot.agent.common.tool.mcp.CallToolResponse;
+import com.mrpot.agent.config.FileExtractionConfig;
+import com.mrpot.agent.exception.FileExtractionException;
+import com.mrpot.agent.exception.ToolInvocationException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +20,6 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -31,21 +33,13 @@ import reactor.core.scheduler.Schedulers;
 public class RagAnswerService {
   
   private static final Logger logger = LoggerFactory.getLogger(RagAnswerService.class);
-  private static final int MAX_FILE_URLS = 3;
   
-  @Value("${file.attach-timeout-seconds:30}")
-  private long attachTimeoutSeconds;
-  
-  @Value("${file.max-concurrent:2}")
-  private int maxConcurrent;
-  
-  @Value("${file.max-urls:3}")
-  private int maxFileUrls;
-  
+  private final FileExtractionConfig fileExtractionConfig;
   private final ToolInvoker toolInvoker;
   private final ObjectMapper objectMapper = new ObjectMapper();
   
-  public RagAnswerService(ToolInvoker toolInvoker) {
+  public RagAnswerService(FileExtractionConfig fileExtractionConfig, ToolInvoker toolInvoker) {
+    this.fileExtractionConfig = fileExtractionConfig;
     this.toolInvoker = toolInvoker;
   }
   
@@ -64,19 +58,18 @@ public class RagAnswerService {
         .map(String::trim)
         .filter(s -> !s.isBlank())
         .distinct()
-        .limit(maxFileUrls)
+        .limit(fileExtractionConfig.getMaxFileUrls())
         .toList();
     
     if (safeUrls.isEmpty()) {
       return Mono.just(List.of());
     }
     
-    // Process URLs with concurrency limit and timeout
     return Flux.fromIterable(safeUrls)
         .flatMap(url ->
             Mono.fromCallable(() -> extractOneFileBlocking(url))
                 .subscribeOn(Schedulers.boundedElastic())
-                .timeout(Duration.ofSeconds(attachTimeoutSeconds))
+                .timeout(Duration.ofSeconds(fileExtractionConfig.getAttachTimeoutSeconds()))
                 .onErrorResume(ex -> {
                   logger.warn("Error extracting file from {}: {}", url, ex.getClass().getSimpleName());
                   return Mono.just(new FileItem(
@@ -89,15 +82,34 @@ public class RagAnswerService {
                       "extract_failed: " + ex.getClass().getSimpleName()
                   ));
                 }),
-            maxConcurrent  // Max concurrent requests
+            fileExtractionConfig.getMaxConcurrent()
         )
         .collectList();
   }
   
-  /**
-   * Extract a single file in blocking mode.
-   */
   private FileItem extractOneFileBlocking(String url) {
+    try {
+      CallToolResponse response = invokeFileTool(url);
+      FileItem errorItem = validateToolResponse(response, url);
+      if (errorItem != null) {
+        return errorItem;
+      }
+      FileUnderstanding understanding = parseFileUnderstanding(response.result());
+      return buildFileItem(url, understanding);
+    } catch (ToolInvocationException e) {
+      logger.error("Tool invocation failed for {}: {}", url, e.getMessage(), e);
+      throw new FileExtractionException(url, "tool_invocation_failed: " + e.getMessage(), e);
+    } catch (FileExtractionException e) {
+      logger.error("File extraction failed for {}: {}", url, e.getMessage(), e);
+      return new FileItem(url, filenameFromUrl(url), guessMimeFromUrl(url),
+          "", List.of(), List.of(), "exception: " + e.getClass().getSimpleName());
+    } catch (Exception e) {
+      logger.error("Unexpected exception extracting file from {}", url, e);
+      throw new FileExtractionException(url, "exception: " + e.getClass().getSimpleName(), e);
+    }
+  }
+
+  private CallToolResponse invokeFileTool(String url) {
     try {
       CallToolRequest toolRequest = new CallToolRequest(
           "file.understandUrl",
@@ -107,48 +119,53 @@ public class RagAnswerService {
           null,
           null
       );
-
       CallToolResponse response = toolInvoker.call(toolRequest).block();
-
-      if (response == null || !response.ok()) {
-        String errorMsg = response != null && response.error() != null
-            ? response.error().message()
-            : "unknown_error";
-        return new FileItem(url, filenameFromUrl(url), guessMimeFromUrl(url),
-            "", List.of(), List.of(), errorMsg);
+      if (response == null) {
+        throw new ToolInvocationException("file.understandUrl", "null response for url: " + url);
       }
+      return response;
+    } catch (ToolInvocationException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new ToolInvocationException("file.understandUrl", "invocation failed for url: " + url, e);
+    }
+  }
 
-      FileUnderstanding understanding = parseFileUnderstanding(response.result());
+  private FileItem validateToolResponse(CallToolResponse response, String url) {
+    if (!response.ok()) {
+      String errorMsg = response.error() != null
+          ? response.error().message()
+          : "unknown_error";
+      return new FileItem(url, filenameFromUrl(url), guessMimeFromUrl(url),
+          "", List.of(), List.of(), errorMsg);
+    }
+    return null;
+  }
 
-      String keyText = understanding.text() == null ? "" : understanding.text().trim();
-      if (keyText.isBlank()
-          && understanding.keywords().isEmpty()
-          && understanding.queries().isEmpty()) {
-        return new FileItem(
-            url,
-            filenameFromUrl(url),
-            guessMimeFromUrl(url),
-            "",
-            List.of(),
-            List.of(),
-            understanding.error() == null ? "extract_empty_result" : understanding.error()
-        );
-      }
-
+  private FileItem buildFileItem(String url, FileUnderstanding understanding) {
+    String keyText = understanding.text() == null ? "" : understanding.text().trim();
+    if (keyText.isBlank()
+        && understanding.keywords().isEmpty()
+        && understanding.queries().isEmpty()) {
       return new FileItem(
           url,
           filenameFromUrl(url),
           guessMimeFromUrl(url),
-          keyText,
-          understanding.keywords(),
-          understanding.queries(),
-          understanding.error()
+          "",
+          List.of(),
+          List.of(),
+          understanding.error() == null ? "extract_empty_result" : understanding.error()
       );
-    } catch (Exception e) {
-      logger.error("Exception extracting file from {}", url, e);
-      return new FileItem(url, filenameFromUrl(url), guessMimeFromUrl(url),
-          "", List.of(), List.of(), "exception: " + e.getClass().getSimpleName());
     }
+    return new FileItem(
+        url,
+        filenameFromUrl(url),
+        guessMimeFromUrl(url),
+        keyText,
+        understanding.keywords(),
+        understanding.queries(),
+        understanding.error()
+    );
   }
 
   /**
@@ -172,87 +189,83 @@ public class RagAnswerService {
     }
   }
   
-  /**
-   * Generate SSE events for file extraction.
-   */
   public Flux<SseEnvelope> generateFileExtractionEvents(
       List<String> urls,
       String traceId,
       String sessionId,
       AtomicLong seq
   ) {
-    // Cleanup URLs
     List<String> safeUrls = urls.stream()
         .filter(Objects::nonNull)
         .map(String::trim)
         .filter(s -> !s.isBlank())
         .distinct()
-        .limit(maxFileUrls)
+        .limit(fileExtractionConfig.getMaxFileUrls())
         .toList();
     
     if (safeUrls.isEmpty()) {
       return Flux.empty();
     }
     
-    // Start event with file list
     List<String> filenames = safeUrls.stream()
         .map(this::filenameFromUrl)
         .toList();
-    Flux<SseEnvelope> startEvent = Flux.just(createEnvelope(
-        StageNames.FILE_EXTRACT_START,
-        "Extracting uploads",
-        Map.of("fileCount", safeUrls.size(), "files", filenames),
-        seq,
-        traceId,
-        sessionId
-    ));
+    Flux<SseEnvelope> startEvent = Flux.just(
+        SseEnvelope.builder()
+            .stage(StageNames.FILE_EXTRACT_START)
+            .message("Extracting uploads")
+            .payload(Map.of("fileCount", safeUrls.size(), "files", filenames))
+            .seq(seq.incrementAndGet())
+            .ts(System.currentTimeMillis())
+            .traceId(traceId)
+            .sessionId(sessionId)
+            .build()
+    );
     
-    // Extract files
     Flux<SseEnvelope> extractEvents = extractFilesMono(safeUrls)
         .flatMapMany(files -> Flux.fromIterable(files)
-            .map(fileItem -> createEnvelope(
-                StageNames.FILE_EXTRACT,
-                "Extracted: " + fileItem.filename(),
-                Map.of(
+            .map(fileItem -> SseEnvelope.builder()
+                .stage(StageNames.FILE_EXTRACT)
+                .message("Extracted: " + fileItem.filename())
+                .payload(Map.of(
                     "filename", fileItem.filename(),
                     "contentPreview", fileItem.text().length() > 100 ?
                         fileItem.text().substring(0, 100) + "..." :
                         fileItem.text(),
                     "keywords", fileItem.keywords(),
                     "success", fileItem.isSuccess()
-                ),
-                seq,
-                traceId,
-                sessionId
-            ))
+                ))
+                .seq(seq.incrementAndGet())
+                .ts(System.currentTimeMillis())
+                .traceId(traceId)
+                .sessionId(sessionId)
+                .build()
+            )
         );
     
-    // Done event
     Flux<SseEnvelope> doneEvent = extractFilesMono(safeUrls)
         .map(files -> {
           long successfulFiles = files.stream().filter(FileItem::isSuccess).count();
           int totalFiles = files.size();
-          return createEnvelope(
-              StageNames.FILE_EXTRACT_DONE,
-              "File extraction complete",
-              Map.of(
+          return SseEnvelope.builder()
+              .stage(StageNames.FILE_EXTRACT_DONE)
+              .message("File extraction complete")
+              .payload(Map.of(
                   "totalFiles", totalFiles,
                   "successfulFiles", successfulFiles,
                   "summary", "Extracted content from " + successfulFiles + " files"
-              ),
-              seq,
-              traceId,
-              sessionId
-          );
+              ))
+              .seq(seq.incrementAndGet())
+              .ts(System.currentTimeMillis())
+              .traceId(traceId)
+              .sessionId(sessionId)
+              .build();
         })
         .flux();
     
     return startEvent.concatWith(extractEvents).concatWith(doneEvent);
   }
   
-  /**
-   * Fuse extracted files into LLM prompt.
-   */
   public String fuseFilesIntoPrompt(List<FileItem> files, String originalQuestion) {
     StringBuilder prompt = new StringBuilder();
     
@@ -270,7 +283,6 @@ public class RagAnswerService {
       boolean truncated = file.text().length() > 40000;
       prompt.append("- truncated: ").append(truncated).append("\n\n");
       
-      // Add file content (limited length)
       int limit = 40000;
       String content = file.text();
       if (content.length() > limit) {
@@ -290,9 +302,6 @@ public class RagAnswerService {
     return prompt.toString();
   }
   
-  /**
-   * Extract filename from URL.
-   */
   private String filenameFromUrl(String url) {
     try {
       String path = new java.net.URI(url).getPath();
@@ -308,9 +317,6 @@ public class RagAnswerService {
     return "file";
   }
   
-  /**
-   * Guess MIME type from URL extension.
-   */
   private String guessMimeFromUrl(String url) {
     if (url.endsWith(".pdf")) return "application/pdf";
     if (url.endsWith(".txt")) return "text/plain";
@@ -321,26 +327,4 @@ public class RagAnswerService {
     return "application/octet-stream";
   }
 
-  
-  /**
-   * Create SSE envelope.
-   */
-  private SseEnvelope createEnvelope(
-      String stage,
-      String message,
-      Object payload,
-      AtomicLong seq,
-      String traceId,
-      String sessionId
-  ) {
-    return new SseEnvelope(
-        stage,
-        message,
-        payload,
-        seq.incrementAndGet(),
-        System.currentTimeMillis(),
-        traceId,
-        sessionId
-    );
-  }
 }

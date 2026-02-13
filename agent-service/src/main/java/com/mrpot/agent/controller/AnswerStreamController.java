@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.MediaType;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -79,7 +80,7 @@ public class AnswerStreamController {
           required = true,
           schema = @Schema(implementation = RagAnswerRequest.class)
       )
-      @RequestBody RagAnswerRequest request
+      @Valid @RequestBody RagAnswerRequest request
   ) {
     // Generate trace ID
     String traceId = UUID.randomUUID().toString();
