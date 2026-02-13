@@ -74,9 +74,17 @@ public class DeepReasoningStage implements Processor<Void, SseEnvelope> {
             .doOnSuccess(done -> {
                 // Store final reasoning for synthesis stage
                 ReasoningResult result = buildResultFromStore(store);
+                String lastFullResponse = "";
+                if (result != null) {
+                    var steps = result.steps();
+                    if (steps != null && !steps.isEmpty()) {
+                        lastFullResponse = steps.get(steps.size() - 1).fullResponse();
+                    }
+                }
                 context.setDeepReasoning(Map.of(
                     "rounds", store.getReasoningStepCount(),
                     "hypothesis", result != null ? result.finalHypothesis() : "Complete",
+                    "fullResponse", lastFullResponse != null ? lastFullResponse : "",
                     "confidence", result != null ? result.finalConfidence() : 0.5,
                     "status", "complete"
                 ));
@@ -134,7 +142,7 @@ public class DeepReasoningStage implements Processor<Void, SseEnvelope> {
         var last = steps.get(steps.size() - 1);
         return new ReasoningResult(
             steps,
-            last.hypothesis(),
+            last.fullResponse(),
             last.confidence(),
             DeepReasoningCoordinator.StopReason.MAX_ROUNDS
         );

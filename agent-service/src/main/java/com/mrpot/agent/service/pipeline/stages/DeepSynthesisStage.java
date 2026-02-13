@@ -151,19 +151,21 @@ public class DeepSynthesisStage implements Processor<Void, SseEnvelope> {
             return DEFAULT_DEEP_ANSWER;
         }
         
-        // Try to extract hypothesis (key from DeepReasoningStage)
+        Object fullResponse = reasoning.get("fullResponse");
+        if (fullResponse != null && !fullResponse.toString().isBlank()) {
+            return fullResponse.toString();
+        }
+        
         Object hypothesis = reasoning.get("hypothesis");
         if (hypothesis != null && !hypothesis.toString().isBlank()) {
             return hypothesis.toString();
         }
         
-        // Fallback: try finalHypothesis
         Object finalHypothesis = reasoning.get("finalHypothesis");
         if (finalHypothesis != null && !finalHypothesis.toString().isBlank()) {
             return finalHypothesis.toString();
         }
         
-        // Fallback: try summary
         Object summary = reasoning.get("summary");
         if (summary != null && !summary.toString().isBlank()) {
             return summary.toString();
@@ -282,12 +284,15 @@ public class DeepSynthesisStage implements Processor<Void, SseEnvelope> {
             return "";
         }
         
-        // Split by lines and filter out lines with reasoning keywords
         String[] lines = answer.split("\n");
         StringBuilder sanitized = new StringBuilder();
+        boolean insideCodeBlock = false;
         
         for (String line : lines) {
-            if (!REASONING_TRACE_PATTERN.matcher(line).find()) {
+            if (line.trim().startsWith("```")) {
+                insideCodeBlock = !insideCodeBlock;
+            }
+            if (insideCodeBlock || !REASONING_TRACE_PATTERN.matcher(line).find()) {
                 sanitized.append(line).append("\n");
             }
         }

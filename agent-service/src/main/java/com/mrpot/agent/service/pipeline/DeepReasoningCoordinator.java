@@ -53,7 +53,8 @@ public class DeepReasoningCoordinator {
         EVIDENCE: <comma-separated evidence supporting your hypothesis>
         """;
     
-    private static final Pattern HYPOTHESIS_PATTERN = Pattern.compile("HYPOTHESIS:\\s*(.+?)(?=\\n|CONFIDENCE|$)", Pattern.DOTALL);
+    private static final Pattern HYPOTHESIS_PATTERN = Pattern.compile("HYPOTHESIS:\\s*(.+?)(?=CONFIDENCE|$)", Pattern.DOTALL);
+    private static final Pattern PRE_HYPOTHESIS_PATTERN = Pattern.compile("^(.+?)(?=HYPOTHESIS:)", Pattern.DOTALL);
     private static final Pattern CONFIDENCE_PATTERN = Pattern.compile("CONFIDENCE:\\s*([0-9.]+)");
     private static final Pattern EVIDENCE_PATTERN = Pattern.compile("EVIDENCE:\\s*(.+?)$", Pattern.DOTALL);
     
@@ -117,7 +118,7 @@ public class DeepReasoningCoordinator {
                 List<ReasoningStep> steps = store.getReasoningSteps();
                 ReasoningStep last = store.getLastReasoningStep();
                 
-                String finalHypothesis = last != null ? last.hypothesis() : "Unable to complete reasoning";
+                String finalHypothesis = last != null ? last.fullResponse() : "Unable to complete reasoning";
                 double finalConfidence = last != null ? last.confidence() : 0.0;
                 
                 return Mono.just(new ReasoningResult(
@@ -179,7 +180,7 @@ public class DeepReasoningCoordinator {
                     
                     return Mono.just(new ReasoningResult(
                         store.getReasoningSteps(),
-                        step.hypothesis(),
+                        step.fullResponse(),
                         step.confidence(),
                         stopReason
                     ));
@@ -231,6 +232,14 @@ public class DeepReasoningCoordinator {
         double confidence = parseConfidence(extractGroup(CONFIDENCE_PATTERN, response, "0.5"));
         String evidenceStr = extractGroup(EVIDENCE_PATTERN, response, "");
         
+        String preHypothesisContent = extractGroup(PRE_HYPOTHESIS_PATTERN, response, "").trim();
+        String fullResponse;
+        if (!preHypothesisContent.isEmpty()) {
+            fullResponse = preHypothesisContent + "\n\n" + hypothesis.trim();
+        } else {
+            fullResponse = hypothesis.trim();
+        }
+        
         List<String> evidenceRefs = evidenceStr.isBlank() ? 
             List.of() : 
             List.of(evidenceStr.split(",")).stream().map(String::trim).toList();
@@ -238,6 +247,7 @@ public class DeepReasoningCoordinator {
         return new ReasoningStep(
             round,
             hypothesis.trim(),
+            fullResponse,
             evidenceRefs,
             confidence,
             System.currentTimeMillis()
