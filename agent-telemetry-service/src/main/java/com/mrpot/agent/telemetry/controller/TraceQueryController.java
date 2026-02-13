@@ -148,14 +148,19 @@ public class TraceQueryController {
             @Parameter(description = "Filter by session ID (exact match)", example = "session-abc-123")
             @RequestParam(required = false) String sessionId,
             @Parameter(description = "Filter by run status", example = "DONE", schema = @Schema(allowableValues = {"RUNNING", "DONE", "FAILED", "CANCELLED"}))
-            @RequestParam(required = false) String status) {
-        log.debug("Searching runs with sessionId={}, status={}", sessionId, status);
+            @RequestParam(required = false) String status,
+            @Parameter(description = "Filter by parent run ID to find replay children", example = "550e8400-e29b-41d4-a716-446655440000")
+            @RequestParam(required = false) String parentRunId) {
+        log.debug("Searching runs with sessionId={}, status={}, parentRunId={}", sessionId, status, parentRunId);
         
-        // Get all runs and filter in memory (for initial implementation)
-        // Can be optimized with custom @Query methods if needed
-        List<KnowledgeRunEntity> runs = runRepo.findAll();
+        List<KnowledgeRunEntity> runs;
 
-        // Apply filters
+        if (parentRunId != null && !parentRunId.isBlank()) {
+            runs = runRepo.findByParentRunId(parentRunId);
+        } else {
+            runs = runRepo.findAll();
+        }
+
         if (sessionId != null && !sessionId.isBlank()) {
             runs = runs.stream()
                     .filter(r -> sessionId.equals(r.getSessionId()))

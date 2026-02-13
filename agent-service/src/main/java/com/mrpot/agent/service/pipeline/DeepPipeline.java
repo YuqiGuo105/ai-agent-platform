@@ -1,5 +1,6 @@
 package com.mrpot.agent.service.pipeline;
 
+import com.mrpot.agent.common.replay.ReplayMode;
 import com.mrpot.agent.service.ConversationHistoryService;
 import com.mrpot.agent.service.LlmService;
 import com.mrpot.agent.service.pipeline.stages.ConversationSaveStage;
@@ -88,27 +89,30 @@ public class DeepPipeline {
         );
         
         // Stage 2: Create reasoning plan
-        // Generate plan for deep reasoning process
+        // In TOOLS_ONLY replay mode, skip LLM-based planning
         runner.addStage(
             "deep_plan",
             new DeepPlanStage(llmService, deepModeConfig),
-            StageConfig.of(Duration.ofSeconds(10))
+            StageConfig.of(Duration.ofSeconds(10),
+                ctx -> ctx.getReplayMode() != ReplayMode.TOOLS_ONLY)
         );
         
         // Stage 3: Execute reasoning steps
-        // Perform reasoning based on the generated plan
+        // In TOOLS_ONLY replay mode, skip LLM-based reasoning
         runner.addStage(
             "deep_reasoning",
             new DeepReasoningStage(reasoningCoordinator),
-            StageConfig.of(Duration.ofSeconds(15))
+            StageConfig.of(Duration.ofSeconds(15),
+                ctx -> ctx.getReplayMode() != ReplayMode.TOOLS_ONLY)
         );
         
         // Stage 4: Synthesize final answer
-        // Combine reasoning results into coherent response
+        // In TOOLS_ONLY replay mode, skip LLM-based synthesis
         runner.addStage(
             "deep_synthesis",
             new DeepSynthesisStage(),
-            StageConfig.of(Duration.ofSeconds(10))
+            StageConfig.of(Duration.ofSeconds(10),
+                ctx -> ctx.getReplayMode() != ReplayMode.TOOLS_ONLY)
         );
         
         // Stage 5: Save conversation to Redis

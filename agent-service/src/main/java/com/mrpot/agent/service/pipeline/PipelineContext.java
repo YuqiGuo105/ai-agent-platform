@@ -5,6 +5,7 @@ import com.mrpot.agent.common.api.ScopeMode;
 import com.mrpot.agent.common.kb.KbDocument;
 import com.mrpot.agent.common.kb.KbHit;
 import com.mrpot.agent.common.policy.ExecutionPolicy;
+import com.mrpot.agent.common.replay.ReplayMode;
 import com.mrpot.agent.common.tool.FileItem;
 
 import java.util.List;
@@ -66,6 +67,11 @@ public class PipelineContext {
     public static final String KEY_DEEP_ROUNDS_USED = "deepRoundsUsed";
     public static final String KEY_TOOL_CALLS_COUNT = "toolCallsCount";
     public static final String KEY_TOOL_SUCCESS_COUNT = "toolSuccessCount";
+    
+    // Replay keys (Sprint 7)
+    public static final String KEY_PARENT_RUN_ID = "parentRunId";
+    public static final String KEY_REPLAY_MODE = "replayMode";
+    public static final String KEY_ALLOWED_TOOLS = "allowedTools";
     
     /**
      * Create a new pipeline context.
@@ -576,6 +582,38 @@ public class PipelineContext {
         return (double) getToolSuccessCount() / total;
     }
     
+    // Replay helper methods (Sprint 7)
+    
+    public void setParentRunId(String parentRunId) {
+        put(KEY_PARENT_RUN_ID, parentRunId);
+    }
+    
+    public String getParentRunId() {
+        return get(KEY_PARENT_RUN_ID);
+    }
+    
+    public void setReplayMode(ReplayMode mode) {
+        put(KEY_REPLAY_MODE, mode);
+    }
+    
+    public ReplayMode getReplayMode() {
+        return get(KEY_REPLAY_MODE);
+    }
+    
+    public void setAllowedTools(java.util.List<String> tools) {
+        put(KEY_ALLOWED_TOOLS, tools);
+    }
+    
+    @SuppressWarnings("unchecked")
+    public java.util.List<String> getAllowedTools() {
+        java.util.List<String> tools = get(KEY_ALLOWED_TOOLS);
+        return tools != null ? tools : java.util.List.of();
+    }
+    
+    public boolean isReplay() {
+        return getReplayMode() != null;
+    }
+    
     /**
      * Builder for PipelineContext.
      */
@@ -636,8 +674,27 @@ public class PipelineContext {
             return this;
         }
         
+        private String parentRunId;
+        private ReplayMode replayMode;
+        private java.util.List<String> allowedTools;
+        
+        public Builder parentRunId(String parentRunId) {
+            this.parentRunId = parentRunId;
+            return this;
+        }
+        
+        public Builder replayMode(ReplayMode replayMode) {
+            this.replayMode = replayMode;
+            return this;
+        }
+        
+        public Builder allowedTools(java.util.List<String> allowedTools) {
+            this.allowedTools = allowedTools;
+            return this;
+        }
+        
         public PipelineContext build() {
-            return new PipelineContext(
+            PipelineContext ctx = new PipelineContext(
                 runId,
                 traceId,
                 sessionId,
@@ -647,6 +704,16 @@ public class PipelineContext {
                 policy,
                 executionMode
             );
+            if (parentRunId != null) {
+                ctx.setParentRunId(parentRunId);
+            }
+            if (replayMode != null) {
+                ctx.setReplayMode(replayMode);
+            }
+            if (allowedTools != null) {
+                ctx.setAllowedTools(allowedTools);
+            }
+            return ctx;
         }
     }
 }

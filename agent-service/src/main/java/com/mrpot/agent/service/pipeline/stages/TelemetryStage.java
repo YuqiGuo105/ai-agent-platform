@@ -135,6 +135,14 @@ public class TelemetryStage implements Processor<Void, SseEnvelope> {
         data.put("question", truncate(question, MAX_QUESTION_LENGTH));
         data.put("executionMode", context.executionMode());
         
+        // Replay fields (Sprint 7)
+        if (context.getParentRunId() != null) {
+            data.put("parentRunId", context.getParentRunId());
+        }
+        if (context.getReplayMode() != null) {
+            data.put("replayMode", context.getReplayMode().name());
+        }
+        
         // Complexity scoring fields (Sprint 6)
         double complexityScore = context.getComplexityScore();
         if (complexityScore > 0) {
@@ -163,6 +171,14 @@ public class TelemetryStage implements Processor<Void, SseEnvelope> {
         data.put("answerFinal", truncate(answer, MAX_ANSWER_LENGTH));
         data.put("totalLatencyMs", totalLatencyMs);
         data.put("executionMode", context.executionMode());
+        
+        // Replay fields (Sprint 7)
+        if (context.getParentRunId() != null) {
+            data.put("parentRunId", context.getParentRunId());
+        }
+        if (context.getReplayMode() != null) {
+            data.put("replayMode", context.getReplayMode().name());
+        }
         
         // Deep mode metrics (Sprint 6)
         if ("DEEP".equals(context.executionMode())) {
