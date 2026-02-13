@@ -153,11 +153,15 @@ public class DeepPlanStage implements Processor<Void, SseEnvelope> {
         return new SseEnvelope(
             StageNames.DEEP_PLAN_DONE,
             "Plan created",
-            Map.of(
-                "status", status,
-                "objective", truncate(plan.objective(), 100),
-                "subtaskCount", plan.subtasks().size(),
-                "constraintCount", plan.constraints().size()
+            Map.ofEntries(
+                Map.entry("status", status),
+                Map.entry("objective", truncate(plan.objective(), 100)),
+                Map.entry("subtaskCount", plan.subtasks().size()),
+                Map.entry("constraintCount", plan.constraints().size()),
+                Map.entry("subtasks", plan.subtasks()),
+                Map.entry("constraints", plan.constraints()),
+                Map.entry("successCriteria", plan.successCriteria()),
+                Map.entry("displayType", "todoList")
             ),
             context.nextSeq(),
             System.currentTimeMillis(),
