@@ -48,6 +48,11 @@ public class PipelineContext {
     public static final String KEY_DEEP_REASONING = "deepReasoning";
     public static final String KEY_DEEP_SYNTHESIS = "deepSynthesis";
     
+    // Deep tool orchestration keys (Sprint 3)
+    public static final String KEY_TOOL_CALL_HISTORY = "toolCallHistory";
+    public static final String KEY_TOOL_EVIDENCE = "toolEvidence";
+    public static final String KEY_TOOL_AUDIT = "toolAudit";
+    
     /**
      * Create a new pipeline context.
      *

@@ -31,4 +31,9 @@ public final class StageNames {
   public static final String TOOL_CALL_ERROR = "tool_call_error";
   public static final String VERIFY = "verify";
   public static final String ERROR = "error";
+
+  // Deep tool orchestration stages (Sprint 3)
+  public static final String DEEP_TOOL_ORCH_START = "deep_tool_orch_start";
+  public static final String DEEP_TOOL_ORCH_RESULT = "deep_tool_orch_result";
+  public static final String DEEP_TOOL_ORCH_DONE = "deep_tool_orch_done";
 }
