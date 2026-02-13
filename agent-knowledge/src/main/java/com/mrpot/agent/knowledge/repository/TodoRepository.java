@@ -88,7 +88,7 @@ public class TodoRepository {
 
         String sql = "UPDATE todos SET title = ?, description = ?, status = ?" + completedSql + " WHERE id = ?";
 
-        jdbcTemplate.update(ps -> {
+        jdbcTemplate.update(sql, ps -> {
             ps.setString(1, newTitle);
             if (newDesc != null) {
                 ps.setString(2, newDesc);
