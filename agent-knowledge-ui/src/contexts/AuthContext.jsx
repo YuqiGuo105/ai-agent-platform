@@ -6,7 +6,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { auth, googleProvider } from '../firebase';
+import { auth, googleProvider, isFirebaseConfigured } from '../firebase';
 
 const AuthContext = createContext(null);
 
@@ -17,6 +17,20 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // If Firebase is not configured, bypass authentication
+    if (!isFirebaseConfigured || !auth) {
+      console.warn('Firebase not configured - bypassing authentication');
+      // Create a mock user for demo purposes when Firebase is not configured
+      setUser({ 
+        uid: 'demo-user', 
+        email: 'demo@example.com',
+        displayName: 'Demo User',
+        isDemo: true 
+      });
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
@@ -24,19 +38,39 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  const loginWithGoogle = () => signInWithPopup(auth, googleProvider);
+  const loginWithGoogle = () => {
+    if (!isFirebaseConfigured || !auth) {
+      return Promise.reject(new Error('Firebase not configured'));
+    }
+    return signInWithPopup(auth, googleProvider);
+  };
 
-  const loginWithEmail = (email, password) =>
-    signInWithEmailAndPassword(auth, email, password);
+  const loginWithEmail = (email, password) => {
+    if (!isFirebaseConfigured || !auth) {
+      return Promise.reject(new Error('Firebase not configured'));
+    }
+    return signInWithEmailAndPassword(auth, email, password);
+  };
 
-  const registerWithEmail = (email, password) =>
-    createUserWithEmailAndPassword(auth, email, password);
+  const registerWithEmail = (email, password) => {
+    if (!isFirebaseConfigured || !auth) {
+      return Promise.reject(new Error('Firebase not configured'));
+    }
+    return createUserWithEmailAndPassword(auth, email, password);
+  };
 
-  const logout = () => signOut(auth);
+  const logout = () => {
+    if (!isFirebaseConfigured || !auth) {
+      setUser(null);
+      return Promise.resolve();
+    }
+    return signOut(auth);
+  };
 
   const value = {
     user,
     loading,
+    isFirebaseConfigured,
     loginWithGoogle,
     loginWithEmail,
     registerWithEmail,
