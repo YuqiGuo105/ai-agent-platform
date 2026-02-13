@@ -7,6 +7,7 @@ import java.util.List;
  * 
  * @param round        the reasoning round number (1-based)
  * @param hypothesis   the current hypothesis or conclusion
+ * @param fullResponse the complete LLM response including code blocks and explanations
  * @param evidenceRefs references to supporting evidence (KB hits, file content, etc.)
  * @param confidence   confidence score between 0.0 and 1.0
  * @param timestampMs  timestamp when this step was completed
@@ -14,6 +15,7 @@ import java.util.List;
 public record ReasoningStep(
     int round,
     String hypothesis,
+    String fullResponse,
     List<String> evidenceRefs,
     double confidence,
     long timestampMs
@@ -24,6 +26,7 @@ public record ReasoningStep(
     public static ReasoningStep simple(int round, String hypothesis, double confidence) {
         return new ReasoningStep(
             round,
+            hypothesis,
             hypothesis,
             List.of(),
             confidence,
