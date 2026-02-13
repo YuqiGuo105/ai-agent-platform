@@ -40,4 +40,9 @@ public final class StageNames {
   // Deep verification and reflection stages (Sprint 4)
   public static final String DEEP_VERIFICATION = "deep_verification";
   public static final String DEEP_REFLECTION = "deep_reflection";
+
+  // Todo list stages
+  public static final String TODO_UPDATE = "todo_update";
+  public static final String TODO_COMPLETE = "todo_complete";
+  public static final String TODO_LIST = "todo_list";
 }
