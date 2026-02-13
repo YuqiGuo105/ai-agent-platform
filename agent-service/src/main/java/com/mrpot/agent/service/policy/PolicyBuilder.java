@@ -52,7 +52,7 @@ public class PolicyBuilder {
     
     /**
      * Build policy for GENERAL scope.
-     * Standard access with limited tools and RAG enabled for knowledge retrieval.
+     * Standard access with tools and RAG enabled, supports both FAST and DEEP modes.
      *
      * @return general execution policy
      */
@@ -60,9 +60,9 @@ public class PolicyBuilder {
         log.debug("Building GENERAL policy with standard access");
         return ExecutionPolicy.builder()
             .allowFile(true)
-            .allowRag(true)  // Enable RAG for FAST mode by default
+            .allowRag(true)  // Enable RAG by default
             .toolAccessLevel(ToolAccessLevel.TIER_A_B)
-            .maxToolRounds(2)
+            .maxToolRounds(5)  // Allow DEEP mode (requires >= 3)
             .allowSideEffectTools(false)
             .preferredMode("FAST")
             .build();

@@ -97,6 +97,27 @@ public class KbDocumentRepository {
         }
     }
 
+    public long fuzzySearchCount(String keyword, String docType) {
+        String pattern = "%" + keyword + "%";
+
+        if (docType != null && !docType.isBlank()) {
+            Long count = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM kb_documents
+                    WHERE (content ILIKE ? OR doc_type ILIKE ? OR metadata::text ILIKE ?)
+                      AND doc_type = ?
+                    """, Long.class, pattern, pattern, pattern, docType);
+            return count != null ? count : 0;
+        }
+
+        Long count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM kb_documents
+                WHERE (content ILIKE ? OR doc_type ILIKE ? OR metadata::text ILIKE ?)
+                """, Long.class, pattern, pattern, pattern);
+        return count != null ? count : 0;
+    }
+
     // ─── Count documents ────────────────────────────────────────────
     public long count() {
         Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM kb_documents", Long.class);

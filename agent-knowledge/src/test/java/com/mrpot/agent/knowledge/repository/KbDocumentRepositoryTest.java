@@ -82,6 +82,13 @@ class KbDocumentRepositoryTest {
     }
 
     @Test
+    void fuzzySearchCount_matchesSearchResultSet() {
+        long count = repository.fuzzySearchCount("machine", null);
+        List<KbDocument> results = repository.fuzzySearch("machine", null, 0, 100);
+        assertThat(count).isEqualTo(results.size());
+    }
+
+    @Test
     void count_returnsPositive() {
         long count = repository.count();
         assertThat(count).isGreaterThan(0);

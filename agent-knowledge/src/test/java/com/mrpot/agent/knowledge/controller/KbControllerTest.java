@@ -43,6 +43,29 @@ class KbControllerTest {
                 .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(1))));
     }
 
+    @Test
+    void searchDocuments_withoutKeyword_returnsPagedEnvelope() throws Exception {
+        mockMvc.perform(get("/kb/documents/search")
+                        .param("page", "0")
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.totalElements", greaterThanOrEqualTo(2)))
+                .andExpect(jsonPath("$.page").value(0));
+    }
+
+    @Test
+    void searchDocuments_withKeyword_filtersResults() throws Exception {
+        mockMvc.perform(get("/kb/documents/search")
+                        .param("keyword", "Spring")
+                        .param("docType", "GUIDE")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$.content[0].docType").value("GUIDE"));
+    }
+
     // ─── GET /kb/documents/{id} ─────────────────────────────────────
 
     @Test

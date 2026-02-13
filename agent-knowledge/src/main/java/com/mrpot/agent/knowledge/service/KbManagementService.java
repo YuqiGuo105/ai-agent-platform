@@ -1,6 +1,7 @@
 package com.mrpot.agent.knowledge.service;
 
 import com.mrpot.agent.common.kb.KbDocument;
+import com.mrpot.agent.knowledge.model.PagedResponse;
 import com.mrpot.agent.knowledge.repository.KbDocumentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +67,23 @@ public class KbManagementService {
         log.info("Fuzzy searching KB – keyword='{}', docType='{}', page={}, size={}",
                 keyword, docType, page, size);
         return repository.fuzzySearch(keyword, docType, page, size);
+    }
+
+    public PagedResponse<KbDocument> searchDocuments(String keyword, String docType, int page, int size) {
+        int resolvedPage = Math.max(page, 0);
+        int resolvedSize = Math.min(Math.max(size, 1), 100);
+
+        if (keyword == null || keyword.isBlank()) {
+            List<KbDocument> content = repository.findAll(resolvedPage, resolvedSize);
+            long totalElements = repository.count();
+            int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / resolvedSize);
+            return new PagedResponse<>(content, resolvedPage, resolvedSize, totalElements, totalPages);
+        }
+
+        List<KbDocument> content = repository.fuzzySearch(keyword, docType, resolvedPage, resolvedSize);
+        long totalElements = repository.fuzzySearchCount(keyword, docType);
+        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / resolvedSize);
+        return new PagedResponse<>(content, resolvedPage, resolvedSize, totalElements, totalPages);
     }
 
     /**

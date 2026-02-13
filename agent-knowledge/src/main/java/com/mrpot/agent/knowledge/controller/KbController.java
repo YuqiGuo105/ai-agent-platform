@@ -2,6 +2,7 @@ package com.mrpot.agent.knowledge.controller;
 
 import com.mrpot.agent.common.kb.KbDocument;
 import com.mrpot.agent.knowledge.model.FuzzySearchRequest;
+import com.mrpot.agent.knowledge.model.PagedResponse;
 import com.mrpot.agent.knowledge.service.KbManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -41,6 +42,26 @@ public class KbController {
 
         List<KbDocument> docs = kbManagementService.getAllDocuments(page, Math.min(size, 100));
         return ResponseEntity.ok(docs);
+    }
+
+    @GetMapping("/documents/search")
+    @Operation(summary = "Search or list KB documents with pagination",
+            description = "Returns paginated documents and total counts. If keyword is omitted, returns all documents.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Paginated results returned")
+    })
+    public ResponseEntity<PagedResponse<KbDocument>> searchDocuments(
+            @Parameter(description = "Optional keyword for fuzzy match")
+            @RequestParam(required = false) String keyword,
+            @Parameter(description = "Optional: exact document type filter")
+            @RequestParam(required = false) String docType,
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "20")
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        PagedResponse<KbDocument> response = kbManagementService.searchDocuments(keyword, docType, page, size);
+        return ResponseEntity.ok(response);
     }
 
     // ─── GET /kb/documents/{id} ─────────────────────────────────────
