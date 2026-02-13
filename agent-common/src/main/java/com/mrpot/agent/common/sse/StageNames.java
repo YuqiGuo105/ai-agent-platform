@@ -14,7 +14,12 @@ public final class StageNames {
 
   // Deep mode stages (safe to add - ignored by old frontend)
   public static final String DEEP_PLAN = "deep_plan";
+  public static final String DEEP_PLAN_START = "deep_plan_start";
+  public static final String DEEP_PLAN_DONE = "deep_plan_done";
   public static final String DEEP_REASONING = "deep_reasoning";
+  public static final String DEEP_REASONING_START = "deep_reasoning_start";
+  public static final String DEEP_REASONING_STEP = "deep_reasoning_step";
+  public static final String DEEP_REASONING_DONE = "deep_reasoning_done";
   public static final String DEEP_SYNTHESIS = "deep_synthesis";
   public static final String FILE_EXTRACT_START = "file_extract_start";
   public static final String FILE_EXTRACT = "file_extract";

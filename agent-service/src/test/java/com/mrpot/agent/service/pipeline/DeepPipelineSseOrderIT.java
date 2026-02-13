@@ -5,11 +5,14 @@ import com.mrpot.agent.common.api.ScopeMode;
 import com.mrpot.agent.common.policy.ExecutionPolicy;
 import com.mrpot.agent.common.sse.StageNames;
 import com.mrpot.agent.service.ConversationHistoryService;
+import com.mrpot.agent.service.LlmService;
+import com.mrpot.agent.service.pipeline.artifacts.DeepPlan;
 import com.mrpot.agent.service.telemetry.RunLogPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -31,6 +34,9 @@ class DeepPipelineSseOrderIT {
 
     private ConversationHistoryService conversationHistoryService;
     private RunLogPublisher runLogPublisher;
+    private LlmService llmService;
+    private DeepModeConfig deepModeConfig;
+    private DeepReasoningCoordinator reasoningCoordinator;
     private DeepPipeline deepPipeline;
     private PipelineContext context;
 
@@ -38,14 +44,27 @@ class DeepPipelineSseOrderIT {
     void setUp() {
         conversationHistoryService = Mockito.mock(ConversationHistoryService.class);
         runLogPublisher = Mockito.mock(RunLogPublisher.class);
+        llmService = Mockito.mock(LlmService.class);
+        deepModeConfig = new DeepModeConfig();
+        reasoningCoordinator = new DeepReasoningCoordinator(llmService, deepModeConfig);
         
-        deepPipeline = new DeepPipeline(conversationHistoryService, runLogPublisher);
+        deepPipeline = new DeepPipeline(
+            conversationHistoryService, 
+            runLogPublisher,
+            llmService,
+            deepModeConfig,
+            reasoningCoordinator
+        );
         
         // Mock conversation history service behavior
         when(conversationHistoryService.getRecentHistory(anyString(), anyInt()))
             .thenReturn(Mono.just(Collections.emptyList()));
         when(conversationHistoryService.saveConversationPair(anyString(), anyString(), anyString()))
             .thenReturn(Mono.empty());
+        
+        // Mock LLM service
+        when(llmService.streamResponse(anyString(), any(), anyString()))
+            .thenReturn(Flux.just("OBJECTIVE: Test\nCONSTRAINTS: NONE\nSUBTASKS: Do\nSUCCESS_CRITERIA: Done"));
         
         // Mock run log publisher behavior (void method, just verify it doesn't throw)
         doNothing().when(runLogPublisher).publish(any());
@@ -82,14 +101,14 @@ class DeepPipelineSseOrderIT {
         
         // Verify DEEP stages are present in order
         int redisIndex = stageNames.indexOf(StageNames.REDIS);
-        int deepPlanIndex = stageNames.indexOf(StageNames.DEEP_PLAN);
-        int deepReasoningIndex = stageNames.indexOf(StageNames.DEEP_REASONING);
+        int deepPlanDoneIndex = stageNames.indexOf(StageNames.DEEP_PLAN_DONE);
+        int deepReasoningDoneIndex = stageNames.indexOf(StageNames.DEEP_REASONING_DONE);
         int deepSynthesisIndex = stageNames.indexOf(StageNames.DEEP_SYNTHESIS);
         
         assertTrue(redisIndex > 0, "REDIS stage should be present");
-        assertTrue(deepPlanIndex > redisIndex, "DEEP_PLAN should come after REDIS");
-        assertTrue(deepReasoningIndex > deepPlanIndex, "DEEP_REASONING should come after DEEP_PLAN");
-        assertTrue(deepSynthesisIndex > deepReasoningIndex, "DEEP_SYNTHESIS should come after DEEP_REASONING");
+        assertTrue(deepPlanDoneIndex > redisIndex, "DEEP_PLAN_DONE should come after REDIS");
+        assertTrue(deepReasoningDoneIndex > deepPlanDoneIndex, "DEEP_REASONING_DONE should come after DEEP_PLAN_DONE");
+        assertTrue(deepSynthesisIndex > deepReasoningDoneIndex, "DEEP_SYNTHESIS should come after DEEP_REASONING_DONE");
     }
 
     @Test
@@ -104,11 +123,11 @@ class DeepPipelineSseOrderIT {
             .toStream()
             .forEach(envelope -> stageNames.add(envelope.stage()));
         
-        // Assert
+        // Assert - verify expected stage names are present
         assertTrue(stageNames.contains(StageNames.START), "Should contain START");
         assertTrue(stageNames.contains(StageNames.REDIS), "Should contain REDIS (history)");
-        assertTrue(stageNames.contains(StageNames.DEEP_PLAN), "Should contain DEEP_PLAN");
-        assertTrue(stageNames.contains(StageNames.DEEP_REASONING), "Should contain DEEP_REASONING");
+        assertTrue(stageNames.contains(StageNames.DEEP_PLAN_DONE), "Should contain DEEP_PLAN_DONE");
+        assertTrue(stageNames.contains(StageNames.DEEP_REASONING_DONE), "Should contain DEEP_REASONING_DONE");
         assertTrue(stageNames.contains(StageNames.DEEP_SYNTHESIS), "Should contain DEEP_SYNTHESIS");
         assertTrue(stageNames.contains(StageNames.ANSWER_FINAL), "Should contain ANSWER_FINAL");
     }
@@ -138,10 +157,12 @@ class DeepPipelineSseOrderIT {
         // Act
         runner.run(context).blockLast();
         
-        // Assert
-        var deepPlan = context.getDeepPlan();
+        // Assert (Sprint 2: use DeepArtifactStore for typed access)
+        DeepArtifactStore store = new DeepArtifactStore(context);
+        DeepPlan deepPlan = store.getPlan();
         assertNotNull(deepPlan, "Deep plan should be set");
-        assertEquals("created", deepPlan.get("status"), "Deep plan status should be 'created'");
+        assertNotNull(deepPlan.objective(), "Deep plan objective should be set");
+        assertFalse(deepPlan.subtasks().isEmpty(), "Deep plan should have subtasks");
     }
 
     @Test
@@ -153,10 +174,10 @@ class DeepPipelineSseOrderIT {
         // Act
         runner.run(context).blockLast();
         
-        // Assert
-        var deepReasoning = context.getDeepReasoning();
-        assertNotNull(deepReasoning, "Deep reasoning should be set");
-        assertEquals("complete", deepReasoning.get("status"), "Deep reasoning status should be 'complete'");
+        // Assert (Sprint 2: use DeepArtifactStore for typed access)
+        DeepArtifactStore store = new DeepArtifactStore(context);
+        var steps = store.getReasoningSteps();
+        assertFalse(steps.isEmpty(), "Reasoning steps should be set");
     }
 
     @Test

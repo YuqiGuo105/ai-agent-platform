@@ -39,6 +39,9 @@ public class PipelineContext {
     public static final String KEY_RAG_DOCS = "ragDocs";
     public static final String KEY_RAG_HITS = "ragHits";
     public static final String KEY_FINAL_ANSWER = "finalAnswer";
+    public static final String KEY_HISTORY = "conversationHistory";
+    public static final String KEY_USER_QUESTION = "userQuestion";
+    public static final String KEY_POLICY = "executionPolicy";
     
     // Deep mode keys
     public static final String KEY_DEEP_PLAN = "deepPlan";

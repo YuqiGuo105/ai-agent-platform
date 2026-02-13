@@ -159,3 +159,10 @@ file:
   max-urls: 3
   attach-timeout-seconds: 30
   max-concurrent: 2
+
+# === DEEP Mode Configuration ===
+deep:
+  max-rounds-cap: 5               # Maximum reasoning rounds cap
+  reasoning-timeout-seconds: 120  # Total timeout for reasoning phase
+  confidence-threshold: 0.85      # Confidence threshold to stop early
+  plan-timeout-seconds: 30        # Timeout for plan generation

@@ -1,6 +1,7 @@
 package com.mrpot.agent.service.pipeline;
 
 import com.mrpot.agent.service.ConversationHistoryService;
+import com.mrpot.agent.service.LlmService;
 import com.mrpot.agent.service.pipeline.stages.ConversationSaveStage;
 import com.mrpot.agent.service.pipeline.stages.DeepPlanStage;
 import com.mrpot.agent.service.pipeline.stages.DeepReasoningStage;
@@ -33,13 +34,22 @@ public class DeepPipeline {
     
     private final ConversationHistoryService conversationHistoryService;
     private final RunLogPublisher runLogPublisher;
+    private final LlmService llmService;
+    private final DeepModeConfig deepModeConfig;
+    private final DeepReasoningCoordinator reasoningCoordinator;
     
     public DeepPipeline(
         ConversationHistoryService conversationHistoryService,
-        RunLogPublisher runLogPublisher
+        RunLogPublisher runLogPublisher,
+        LlmService llmService,
+        DeepModeConfig deepModeConfig,
+        DeepReasoningCoordinator reasoningCoordinator
     ) {
         this.conversationHistoryService = conversationHistoryService;
         this.runLogPublisher = runLogPublisher;
+        this.llmService = llmService;
+        this.deepModeConfig = deepModeConfig;
+        this.reasoningCoordinator = reasoningCoordinator;
     }
     
     /**
@@ -81,7 +91,7 @@ public class DeepPipeline {
         // Generate plan for deep reasoning process
         runner.addStage(
             "deep_plan",
-            new DeepPlanStage(),
+            new DeepPlanStage(llmService, deepModeConfig),
             StageConfig.of(Duration.ofSeconds(10))
         );
         
@@ -89,7 +99,7 @@ public class DeepPipeline {
         // Perform reasoning based on the generated plan
         runner.addStage(
             "deep_reasoning",
-            new DeepReasoningStage(),
+            new DeepReasoningStage(reasoningCoordinator),
             StageConfig.of(Duration.ofSeconds(15))
         );
         
