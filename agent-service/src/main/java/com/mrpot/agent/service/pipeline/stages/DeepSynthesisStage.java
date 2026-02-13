@@ -7,8 +7,10 @@ import com.mrpot.agent.common.sse.StageNames;
 import com.mrpot.agent.service.pipeline.PipelineContext;
 import com.mrpot.agent.service.pipeline.Processor;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,11 +26,18 @@ import java.util.regex.Pattern;
  * - Adds uncertainty declaration for unresolved claims
  * - Sanitizes raw reasoning traces (filters internal keywords)
  * - Produces UI blocks for structured display
+ * - Streams answer incrementally via answer_delta events for consistent UX with fast mode
  */
 @Slf4j
-public class DeepSynthesisStage implements Processor<Void, SseEnvelope> {
+public class DeepSynthesisStage implements Processor<Void, Flux<SseEnvelope>> {
     
     private static final String DEFAULT_DEEP_ANSWER = "DEEP mode answer";
+    
+    // Target characters per second for streaming (controls visual speed)
+    private static final int CHARS_PER_SECOND = 80;
+    
+    // Minimum delay between chunks in milliseconds
+    private static final long MIN_CHUNK_DELAY_MS = 10;
     
     // Pattern to detect and sanitize raw reasoning traces
     private static final Pattern REASONING_TRACE_PATTERN = Pattern.compile(
@@ -37,7 +46,7 @@ public class DeepSynthesisStage implements Processor<Void, SseEnvelope> {
     );
     
     @Override
-    public Mono<SseEnvelope> process(Void input, PipelineContext context) {
+    public Mono<Flux<SseEnvelope>> process(Void input, PipelineContext context) {
         log.debug("Starting deep synthesis stage for runId={}", context.runId());
         
         return Mono.fromSupplier(() -> {
@@ -93,23 +102,54 @@ public class DeepSynthesisStage implements Processor<Void, SseEnvelope> {
             log.info("Deep synthesis completed for runId={}: answer length={}, unresolved claims={}", 
                 context.runId(), finalAnswer.length(), unresolvedClaims.size());
             
-            // Create SSE envelope with synthesis result
-            return new SseEnvelope(
+            // Split answer into token-sized chunks for smooth streaming
+            List<String> chunks = splitIntoTokens(finalAnswer);
+            
+            // Calculate delay per chunk to achieve target streaming speed
+            // Total streaming time = answer length / CHARS_PER_SECOND seconds
+            long totalStreamingTimeMs = (long) (finalAnswer.length() * 1000.0 / CHARS_PER_SECOND);
+            long delayPerChunkMs = chunks.isEmpty() ? MIN_CHUNK_DELAY_MS : 
+                Math.max(MIN_CHUNK_DELAY_MS, totalStreamingTimeMs / chunks.size());
+            
+            // Capture uiBlocks and unresolvedClaims for use in deferred synthesis event
+            final List<Map<String, Object>> finalUiBlocks = uiBlocks;
+            final List<String> finalUnresolvedClaims = unresolvedClaims;
+            final long chunkDelay = delayPerChunkMs;
+            
+            // Create streaming flux of answer_delta events followed by deep_synthesis event
+            Flux<SseEnvelope> answerDeltaEvents = Flux.fromIterable(chunks)
+                .delayElements(Duration.ofMillis(chunkDelay))
+                .map(chunk -> new SseEnvelope(
+                    StageNames.ANSWER_DELTA,
+                    chunk,
+                    Map.of("delta", chunk),
+                    context.nextSeq(),
+                    System.currentTimeMillis(),
+                    context.traceId(),
+                    context.sessionId()
+                ))
+                .filter(envelope -> !envelope.message().isEmpty());
+            
+            // Create deferred deep_synthesis event - seq number assigned after all answer_delta events
+            Flux<SseEnvelope> synthesisEvent = Flux.defer(() -> Flux.just(new SseEnvelope(
                 StageNames.DEEP_SYNTHESIS,
                 "Synthesis complete",
                 Map.of(
                     "round", context.getCurrentRound(),
                     "status", "complete",
                     "summary", "Synthesis complete",
-                    "hasUncertainty", !unresolvedClaims.isEmpty(),
-                    "unresolvedCount", unresolvedClaims.size(),
-                    "uiBlocks", uiBlocks
+                    "hasUncertainty", !finalUnresolvedClaims.isEmpty(),
+                    "unresolvedCount", finalUnresolvedClaims.size(),
+                    "uiBlocks", finalUiBlocks
                 ),
                 context.nextSeq(),
                 System.currentTimeMillis(),
                 context.traceId(),
                 context.sessionId()
-            );
+            )));
+            
+            // Concatenate answer_delta events with final deep_synthesis event
+            return answerDeltaEvents.concatWith(synthesisEvent);
         }).onErrorResume(e -> {
             log.error("Failed to complete deep synthesis for runId={}: {}", 
                 context.runId(), e.getMessage(), e);
@@ -125,8 +165,8 @@ public class DeepSynthesisStage implements Processor<Void, SseEnvelope> {
             context.setFinalAnswer("Error generating response");
             context.setSynthesisBlocks(List.of());
             
-            // Return error indicator envelope
-            return Mono.just(new SseEnvelope(
+            // Return error flux with single error envelope
+            return Mono.just(Flux.just(new SseEnvelope(
                 StageNames.DEEP_SYNTHESIS,
                 "Synthesis failed",
                 Map.of(
@@ -139,8 +179,96 @@ public class DeepSynthesisStage implements Processor<Void, SseEnvelope> {
                 System.currentTimeMillis(),
                 context.traceId(),
                 context.sessionId()
-            ));
+            )));
         });
+    }
+    
+    /**
+     * Split text into token-sized chunks for smooth streaming.
+     * Chinese characters are split individually.
+     * English words are kept together (split at word boundaries).
+     * Punctuation and whitespace are included with adjacent text.
+     */
+    private List<String> splitIntoTokens(String text) {
+        List<String> tokens = new ArrayList<>();
+        if (text == null || text.isEmpty()) {
+            return tokens;
+        }
+        
+        StringBuilder currentToken = new StringBuilder();
+        
+        for (int i = 0; i < text.length(); ) {
+            int codePoint = text.codePointAt(i);
+            int charCount = Character.charCount(codePoint);
+            String ch = text.substring(i, i + charCount);
+            
+            if (isCJKCharacter(codePoint)) {
+                // CJK characters are emitted individually
+                if (currentToken.length() > 0) {
+                    tokens.add(currentToken.toString());
+                    currentToken.setLength(0);
+                }
+                tokens.add(ch);
+            } else if (Character.isWhitespace(codePoint) || isPunctuation(codePoint)) {
+                // Whitespace and punctuation end current token
+                currentToken.append(ch);
+                if (currentToken.length() > 0) {
+                    tokens.add(currentToken.toString());
+                    currentToken.setLength(0);
+                }
+            } else {
+                // ASCII letters/numbers - accumulate into word tokens
+                currentToken.append(ch);
+                // Emit token if it gets too long (max 4 chars for smooth effect)
+                if (currentToken.length() >= 4) {
+                    tokens.add(currentToken.toString());
+                    currentToken.setLength(0);
+                }
+            }
+            
+            i += charCount;
+        }
+        
+        // Add remaining token
+        if (currentToken.length() > 0) {
+            tokens.add(currentToken.toString());
+        }
+        
+        return tokens;
+    }
+    
+    /**
+     * Check if a code point is a CJK (Chinese/Japanese/Korean) character.
+     */
+    private boolean isCJKCharacter(int codePoint) {
+        Character.UnicodeBlock block = Character.UnicodeBlock.of(codePoint);
+        return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+            || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
+            || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B
+            || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS
+            || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_C
+            || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_D
+            || block == Character.UnicodeBlock.HIRAGANA
+            || block == Character.UnicodeBlock.KATAKANA
+            || block == Character.UnicodeBlock.HANGUL_SYLLABLES
+            || block == Character.UnicodeBlock.HANGUL_JAMO
+            || block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO
+            || block == Character.UnicodeBlock.CJK_SYMBOLS_AND_PUNCTUATION
+            || block == Character.UnicodeBlock.HALFWIDTH_AND_FULLWIDTH_FORMS;
+    }
+    
+    /**
+     * Check if a code point is punctuation.
+     */
+    private boolean isPunctuation(int codePoint) {
+        int type = Character.getType(codePoint);
+        return type == Character.CONNECTOR_PUNCTUATION
+            || type == Character.DASH_PUNCTUATION
+            || type == Character.END_PUNCTUATION
+            || type == Character.FINAL_QUOTE_PUNCTUATION
+            || type == Character.INITIAL_QUOTE_PUNCTUATION
+            || type == Character.OTHER_PUNCTUATION
+            || type == Character.START_PUNCTUATION;
     }
     
     /**
