@@ -1,6 +1,7 @@
 package com.mrpot.agent.common.api;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Map;
@@ -23,9 +24,11 @@ import java.util.UUID;
  */
 @Schema(description = "RAG answer request with question, session context, and tool configuration")
 public record RagAnswerRequest(
+    @NotBlank(message = "question must not be blank")
     @Schema(description = "User's question", example = "What is the weather today?", required = true)
     String question,
     
+    @NotBlank(message = "sessionId must not be blank")
     @Schema(description = "Chat session ID for memory separation", example = "sess-12345", required = true)
     String sessionId,
     
