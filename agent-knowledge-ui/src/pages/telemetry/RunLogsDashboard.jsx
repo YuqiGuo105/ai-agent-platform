@@ -9,8 +9,8 @@ import './TelemetryStyles.css';
  * Features:
  * - Search by session ID
  * - Filter by status
- * - Paginated results
- * - Click to view run details
+ * - Paginated results with collapsible rows
+ * - Click to expand and view run details
  */
 function RunLogsDashboard() {
   const navigate = useNavigate();
@@ -23,6 +23,7 @@ function RunLogsDashboard() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [jumpPage, setJumpPage] = useState('');
+  const [expandedRows, setExpandedRows] = useState(new Set());
   
   // Filters from URL params
   const sessionId = searchParams.get('sessionId') || '';
@@ -40,9 +41,21 @@ function RunLogsDashboard() {
       if (status) params.status = status;
       
       const data = await searchRuns(params);
-      setRuns(data.content || []);
-      setTotalPages(data.totalPages || 0);
-      setTotalElements(data.totalElements || 0);
+      
+      // Handle both array response and paginated object response
+      if (Array.isArray(data)) {
+        // API returns plain array - do client-side pagination
+        const startIdx = page * size;
+        const endIdx = startIdx + size;
+        setRuns(data.slice(startIdx, endIdx));
+        setTotalPages(Math.ceil(data.length / size));
+        setTotalElements(data.length);
+      } else {
+        // API returns paginated object
+        setRuns(data.content || []);
+        setTotalPages(data.totalPages || 0);
+        setTotalElements(data.totalElements || 0);
+      }
     } catch (err) {
       setError(err.message || 'Failed to fetch runs');
       setRuns([]);
@@ -78,6 +91,30 @@ function RunLogsDashboard() {
   // Get status badge class
   const getStatusClass = (status) => {
     return status?.toLowerCase() || 'unknown';
+  };
+
+  // Toggle row expansion
+  const toggleRow = (runId) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(runId)) {
+        newSet.delete(runId);
+      } else {
+        newSet.add(runId);
+      }
+      return newSet;
+    });
+  };
+
+  // Get status icon
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'DONE': return '✅';
+      case 'RUNNING': return '🔄';
+      case 'FAILED': return '❌';
+      case 'CANCELLED': return '⏹️';
+      default: return '❓';
+    }
   };
 
   return (
@@ -147,49 +184,140 @@ function RunLogsDashboard() {
         ) : (
           <>
             <div className="table-container">
-              <table>
+              <table className="runs-table">
                 <thead>
                   <tr>
-                    <th>Run ID</th>
-                    <th>Session ID</th>
+                    <th style={{ width: '40px' }}></th>
                     <th>Status</th>
-                    <th>Query</th>
-                    <th>Started At</th>
-                    <th>Duration</th>
+                    <th>Question</th>
+                    <th>Created At</th>
+                    <th>Latency</th>
                     <th>Mode</th>
                   </tr>
                 </thead>
                 <tbody>
                   {runs.map((run) => (
-                    <tr
-                      key={run.runId}
-                      className="clickable-row"
-                      onClick={() => handleRowClick(run.runId)}
-                    >
-                      <td className="mono truncate" title={run.runId}>
-                        {run.runId?.slice(0, 8)}...
-                      </td>
-                      <td className="mono truncate" title={run.sessionId}>
-                        {run.sessionId?.slice(0, 12)}...
-                      </td>
-                      <td>
-                        <span className={`status-badge ${getStatusClass(run.status)}`}>
-                          {run.status}
-                        </span>
-                      </td>
-                      <td className="truncate" title={run.query}>
-                        {run.query || '-'}
-                      </td>
-                      <td>{formatDateTime(run.startTime)}</td>
-                      <td>
-                        {run.endTime
-                          ? formatDuration(run.startTime, run.endTime)
-                          : run.status === 'RUNNING'
-                          ? '⏳ Running...'
-                          : '-'}
-                      </td>
-                      <td>{run.mode || 'DEFAULT'}</td>
-                    </tr>
+                    <>
+                      <tr
+                        key={run.id}
+                        className={`clickable-row ${expandedRows.has(run.id) ? 'expanded' : ''}`}
+                        onClick={() => toggleRow(run.id)}
+                      >
+                        <td className="expand-cell">
+                          <span className="expand-icon">{expandedRows.has(run.id) ? '▼' : '▶'}</span>
+                        </td>
+                        <td>
+                          <span className={`status-badge ${getStatusClass(run.status)}`}>
+                            {getStatusIcon(run.status)} {run.status}
+                          </span>
+                        </td>
+                        <td className="question-cell" title={run.question}>
+                          {run.question || <span className="text-muted">No question</span>}
+                        </td>
+                        <td className="nowrap">{formatDateTime(run.createdAt)}</td>
+                        <td className="nowrap">
+                          {run.totalLatencyMs
+                            ? `${(run.totalLatencyMs / 1000).toFixed(2)}s`
+                            : run.status === 'RUNNING'
+                            ? '⏳ Running...'
+                            : '-'}
+                        </td>
+                        <td>
+                          <span className={`mode-badge ${run.mode?.toLowerCase() || 'general'}`}>
+                            {run.mode || 'GENERAL'}
+                          </span>
+                        </td>
+                      </tr>
+                      {expandedRows.has(run.id) && (
+                        <tr key={`${run.id}-details`} className="details-row">
+                          <td colSpan="6">
+                            <div className="run-details">
+                              <div className="details-grid">
+                                <div className="detail-section">
+                                  <h4>Identifiers</h4>
+                                  <div className="detail-item">
+                                    <span className="detail-label">Run ID:</span>
+                                    <code className="detail-value">{run.id}</code>
+                                  </div>
+                                  <div className="detail-item">
+                                    <span className="detail-label">Session ID:</span>
+                                    <code className="detail-value">{run.sessionId || '-'}</code>
+                                  </div>
+                                  <div className="detail-item">
+                                    <span className="detail-label">Trace ID:</span>
+                                    <code className="detail-value">{run.traceId || '-'}</code>
+                                  </div>
+                                  <div className="detail-item">
+                                    <span className="detail-label">User ID:</span>
+                                    <code className="detail-value">{run.userId || '-'}</code>
+                                  </div>
+                                </div>
+                                <div className="detail-section">
+                                  <h4>Timing</h4>
+                                  <div className="detail-item">
+                                    <span className="detail-label">Created:</span>
+                                    <span className="detail-value">{formatDateTime(run.createdAt)}</span>
+                                  </div>
+                                  <div className="detail-item">
+                                    <span className="detail-label">Updated:</span>
+                                    <span className="detail-value">{formatDateTime(run.updatedAt)}</span>
+                                  </div>
+                                  <div className="detail-item">
+                                    <span className="detail-label">Total Latency:</span>
+                                    <span className="detail-value">
+                                      {run.totalLatencyMs ? `${run.totalLatencyMs}ms (${(run.totalLatencyMs / 1000).toFixed(2)}s)` : '-'}
+                                    </span>
+                                  </div>
+                                  <div className="detail-item">
+                                    <span className="detail-label">KB Latency:</span>
+                                    <span className="detail-value">{run.kbLatencyMs ? `${run.kbLatencyMs}ms` : '-'}</span>
+                                  </div>
+                                </div>
+                                <div className="detail-section">
+                                  <h4>Configuration</h4>
+                                  <div className="detail-item">
+                                    <span className="detail-label">Model:</span>
+                                    <span className="detail-value">{run.model || '-'}</span>
+                                  </div>
+                                  <div className="detail-item">
+                                    <span className="detail-label">Mode:</span>
+                                    <span className="detail-value">{run.mode || 'GENERAL'}</span>
+                                  </div>
+                                  <div className="detail-item">
+                                    <span className="detail-label">KB Hits:</span>
+                                    <span className="detail-value">{run.kbHitCount ?? '-'}</span>
+                                  </div>
+                                  <div className="detail-item">
+                                    <span className="detail-label">Error Code:</span>
+                                    <span className="detail-value">{run.errorCode || '-'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              {run.question && (
+                                <div className="detail-section full-width">
+                                  <h4>Question</h4>
+                                  <div className="detail-content">{run.question}</div>
+                                </div>
+                              )}
+                              {run.answerFinal && (
+                                <div className="detail-section full-width">
+                                  <h4>Answer</h4>
+                                  <div className="detail-content answer-content">{run.answerFinal}</div>
+                                </div>
+                              )}
+                              <div className="detail-actions">
+                                <button 
+                                  className="btn btn-primary btn-sm"
+                                  onClick={(e) => { e.stopPropagation(); navigate(`/telemetry/runs/${run.id}`); }}
+                                >
+                                  View Full Details →
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>
@@ -224,7 +352,7 @@ function RunLogsDashboard() {
                   Next →
                 </button>
                 <span className="jump-page">
-                  跳转
+                  Go to page
                   <input
                     type="number"
                     min="1"
@@ -242,7 +370,7 @@ function RunLogsDashboard() {
                       }
                     }}
                   />
-                  页
+                  of {totalPages}
                   <button
                     className="btn btn-sm btn-primary"
                     onClick={() => {

@@ -9,13 +9,10 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
       '/telemetry-api': {
-        target: 'http://localhost:8082',
+        target: 'https://agent-telemetry-service-production.up.railway.app',
         changeOrigin: true,
+        secure: false,
         rewrite: (path) => path.replace(/^\/telemetry-api/, '/api'),
       },
     },
