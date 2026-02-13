@@ -342,4 +342,139 @@ public final class DeepToolSchemas {
         schema.set("properties", properties);
         return schema;
     }
+    
+    // ============ Verification Tools (Sprint 4) ============
+    
+    /**
+     * Input schema for verify.consistency tool.
+     */
+    public static ObjectNode verifyConsistencyInput() {
+        ObjectNode schema = mapper.createObjectNode();
+        schema.put("type", "object");
+        
+        ObjectNode properties = mapper.createObjectNode();
+        
+        // reasoningArtifacts array
+        ObjectNode reasoningArtifacts = mapper.createObjectNode();
+        reasoningArtifacts.put("type", "array");
+        reasoningArtifacts.put("description", "List of reasoning steps to check for consistency");
+        
+        ObjectNode artifactItem = mapper.createObjectNode();
+        artifactItem.put("type", "object");
+        ObjectNode artifactProps = mapper.createObjectNode();
+        artifactProps.set("hypothesis", mapper.createObjectNode().put("type", "string"));
+        ObjectNode evidenceRefs = mapper.createObjectNode();
+        evidenceRefs.put("type", "array");
+        evidenceRefs.set("items", mapper.createObjectNode().put("type", "string"));
+        artifactProps.set("evidenceRefs", evidenceRefs);
+        artifactProps.set("confidence", mapper.createObjectNode().put("type", "number"));
+        artifactItem.set("properties", artifactProps);
+        
+        reasoningArtifacts.set("items", artifactItem);
+        properties.set("reasoningArtifacts", reasoningArtifacts);
+        
+        schema.set("properties", properties);
+        schema.set("required", mapper.createArrayNode().add("reasoningArtifacts"));
+        
+        return schema;
+    }
+    
+    /**
+     * Output schema for verify.consistency tool.
+     */
+    public static ObjectNode verifyConsistencyOutput() {
+        ObjectNode schema = mapper.createObjectNode();
+        schema.put("type", "object");
+        
+        ObjectNode properties = mapper.createObjectNode();
+        
+        ObjectNode consistencyScore = mapper.createObjectNode();
+        consistencyScore.put("type", "number");
+        consistencyScore.put("description", "Consistency score from 0.0 to 1.0");
+        properties.set("consistencyScore", consistencyScore);
+        
+        ObjectNode contradictions = mapper.createObjectNode();
+        contradictions.put("type", "array");
+        ObjectNode contradictionItem = mapper.createObjectNode();
+        contradictionItem.put("type", "object");
+        ObjectNode contradictionProps = mapper.createObjectNode();
+        contradictionProps.set("stepA", mapper.createObjectNode().put("type", "integer"));
+        contradictionProps.set("stepB", mapper.createObjectNode().put("type", "integer"));
+        contradictionProps.set("description", mapper.createObjectNode().put("type", "string"));
+        contradictionItem.set("properties", contradictionProps);
+        contradictions.set("items", contradictionItem);
+        properties.set("contradictions", contradictions);
+        
+        ObjectNode flags = mapper.createObjectNode();
+        flags.put("type", "array");
+        flags.set("items", mapper.createObjectNode().put("type", "string"));
+        properties.set("flags", flags);
+        
+        schema.set("properties", properties);
+        return schema;
+    }
+    
+    /**
+     * Input schema for verify.fact_check tool.
+     */
+    public static ObjectNode verifyFactCheckInput() {
+        ObjectNode schema = mapper.createObjectNode();
+        schema.put("type", "object");
+        
+        ObjectNode properties = mapper.createObjectNode();
+        
+        ObjectNode claims = mapper.createObjectNode();
+        claims.put("type", "array");
+        claims.put("description", "List of claims to verify");
+        claims.set("items", mapper.createObjectNode().put("type", "string"));
+        properties.set("claims", claims);
+        
+        ObjectNode evidenceSources = mapper.createObjectNode();
+        evidenceSources.put("type", "array");
+        evidenceSources.put("description", "Available evidence sources");
+        evidenceSources.set("items", mapper.createObjectNode().put("type", "string"));
+        properties.set("evidenceSources", evidenceSources);
+        
+        schema.set("properties", properties);
+        schema.set("required", mapper.createArrayNode().add("claims"));
+        
+        return schema;
+    }
+    
+    /**
+     * Output schema for verify.fact_check tool.
+     */
+    public static ObjectNode verifyFactCheckOutput() {
+        ObjectNode schema = mapper.createObjectNode();
+        schema.put("type", "object");
+        
+        ObjectNode properties = mapper.createObjectNode();
+        
+        ObjectNode factualityFlags = mapper.createObjectNode();
+        factualityFlags.put("type", "array");
+        ObjectNode flagItem = mapper.createObjectNode();
+        flagItem.put("type", "object");
+        ObjectNode flagProps = mapper.createObjectNode();
+        flagProps.set("claim", mapper.createObjectNode().put("type", "string"));
+        ObjectNode verdict = mapper.createObjectNode();
+        verdict.put("type", "string");
+        ArrayNode verdictEnum = mapper.createArrayNode();
+        verdictEnum.add("supported");
+        verdictEnum.add("unsupported");
+        verdictEnum.add("unverifiable");
+        verdict.set("enum", verdictEnum);
+        flagProps.set("verdict", verdict);
+        flagProps.set("confidence", mapper.createObjectNode().put("type", "number"));
+        flagItem.set("properties", flagProps);
+        factualityFlags.set("items", flagItem);
+        properties.set("factualityFlags", factualityFlags);
+        
+        ObjectNode unresolvedClaims = mapper.createObjectNode();
+        unresolvedClaims.put("type", "array");
+        unresolvedClaims.set("items", mapper.createObjectNode().put("type", "string"));
+        properties.set("unresolvedClaims", unresolvedClaims);
+        
+        schema.set("properties", properties);
+        return schema;
+    }
 }

@@ -307,4 +307,57 @@ public class DeepReasoningCoordinator {
         if (s == null) return "";
         return s.length() <= maxLen ? s : s.substring(0, maxLen) + "...";
     }
+    
+    // ============ Sprint 4: Verification-triggered additional rounds ============
+    
+    /**
+     * Check if an additional reasoning round should be executed.
+     * This is called after verification and reflection stages.
+     * 
+     * @param context Pipeline context
+     * @return true if additional round should be executed
+     */
+    public boolean shouldExecuteAdditionalRound(PipelineContext context) {
+        boolean needsAdditional = context.needsAdditionalRound();
+        int currentRound = context.getCurrentRound();
+        int maxRounds = config.getMaxRoundsCap();
+        
+        if (!needsAdditional) {
+            log.debug("No additional round needed for runId={}", context.runId());
+            return false;
+        }
+        
+        if (currentRound >= maxRounds) {
+            log.info("Max rounds ({}) reached for runId={}, no additional round", maxRounds, context.runId());
+            return false;
+        }
+        
+        log.info("Additional round needed for runId={}: round {} of {}", 
+            context.runId(), currentRound + 1, maxRounds);
+        return true;
+    }
+    
+    /**
+     * Prepare context for an additional reasoning round.
+     * 
+     * @param context Pipeline context
+     */
+    public void prepareAdditionalRound(PipelineContext context) {
+        int nextRound = context.getCurrentRound() + 1;
+        context.setCurrentRound(nextRound);
+        context.setNeedsAdditionalRound(false); // Reset flag
+        
+        log.debug("Prepared round {} for runId={}", nextRound, context.runId());
+    }
+    
+    /**
+     * Get the effective max rounds considering both policy and config cap.
+     * 
+     * @param context Pipeline context
+     * @return effective max rounds
+     */
+    public int getEffectiveMaxRounds(PipelineContext context) {
+        int policyMax = context.policy() != null ? context.policy().maxToolRounds() : config.getMaxRoundsCap();
+        return Math.min(policyMax, config.getMaxRoundsCap());
+    }
 }

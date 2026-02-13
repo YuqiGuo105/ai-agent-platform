@@ -53,6 +53,13 @@ public class PipelineContext {
     public static final String KEY_TOOL_EVIDENCE = "toolEvidence";
     public static final String KEY_TOOL_AUDIT = "toolAudit";
     
+    // Deep verification and reflection keys (Sprint 4)
+    public static final String KEY_VERIFICATION_REPORT = "verificationReport";
+    public static final String KEY_REFLECTION_NOTE = "reflectionNote";
+    public static final String KEY_NEEDS_ADDITIONAL_ROUND = "needsAdditionalRound";
+    public static final String KEY_SYNTHESIS_BLOCKS = "synthesisBlocks";
+    public static final String KEY_CURRENT_ROUND = "currentRound";
+    
     /**
      * Create a new pipeline context.
      *
@@ -353,6 +360,101 @@ public class PipelineContext {
     @SuppressWarnings("unchecked")
     public Map<String, Object> getDeepSynthesis() {
         return get(KEY_DEEP_SYNTHESIS);
+    }
+    
+    // Deep verification and reflection helper methods (Sprint 4)
+    
+    /**
+     * Set verification report in working memory.
+     *
+     * @param report the verification report
+     */
+    public void setVerificationReport(com.mrpot.agent.common.deep.VerificationReport report) {
+        put(KEY_VERIFICATION_REPORT, report);
+    }
+    
+    /**
+     * Get verification report from working memory.
+     *
+     * @return the verification report, or null if not set
+     */
+    public com.mrpot.agent.common.deep.VerificationReport getVerificationReport() {
+        return get(KEY_VERIFICATION_REPORT);
+    }
+    
+    /**
+     * Set reflection note in working memory.
+     *
+     * @param note the reflection note
+     */
+    public void setReflectionNote(com.mrpot.agent.common.deep.ReflectionNote note) {
+        put(KEY_REFLECTION_NOTE, note);
+    }
+    
+    /**
+     * Get reflection note from working memory.
+     *
+     * @return the reflection note, or null if not set
+     */
+    public com.mrpot.agent.common.deep.ReflectionNote getReflectionNote() {
+        return get(KEY_REFLECTION_NOTE);
+    }
+    
+    /**
+     * Set whether an additional round is needed.
+     *
+     * @param needed true if additional round is needed
+     */
+    public void setNeedsAdditionalRound(boolean needed) {
+        put(KEY_NEEDS_ADDITIONAL_ROUND, needed);
+    }
+    
+    /**
+     * Check if an additional round is needed.
+     *
+     * @return true if additional round is needed, false by default
+     */
+    public boolean needsAdditionalRound() {
+        return getOrDefault(KEY_NEEDS_ADDITIONAL_ROUND, false);
+    }
+    
+    /**
+     * Set synthesis UI blocks in working memory.
+     *
+     * @param blocks the synthesis UI blocks
+     */
+    @SuppressWarnings("unchecked")
+    public void setSynthesisBlocks(List<Map<String, Object>> blocks) {
+        put(KEY_SYNTHESIS_BLOCKS, blocks);
+    }
+    
+    /**
+     * Get synthesis UI blocks from working memory.
+     *
+     * @return the synthesis UI blocks, or empty list if not set
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getSynthesisBlocks() {
+        List<Map<String, Object>> blocks = get(KEY_SYNTHESIS_BLOCKS);
+        return blocks != null ? blocks : List.of();
+    }
+    
+    /**
+     * Set current reasoning round.
+     *
+     * @param round the current round number
+     */
+    public void setCurrentRound(int round) {
+        put(KEY_CURRENT_ROUND, round);
+    }
+    
+    /**
+     * Get current reasoning round.
+     *
+     * @return the current round number, 0 by default
+     */
+    public int getCurrentRound() {
+        return getOrDefault(KEY_CURRENT_ROUND, 0);
     }
     
     /**
