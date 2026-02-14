@@ -57,7 +57,7 @@ public class DeepReflectionStage implements Processor<Void, SseEnvelope> {
             // Create SSE envelope with reflection result
             return new SseEnvelope(
                 StageNames.DEEP_REFLECTION,
-                "Reflection complete",
+                "Reflection: " + note.followupAction(),
                 Map.of(
                     "contradictionFlag", note.contradictionFlag(),
                     "followupAction", note.followupAction(),
@@ -83,7 +83,7 @@ public class DeepReflectionStage implements Processor<Void, SseEnvelope> {
             // Return error indicator envelope
             return Mono.just(new SseEnvelope(
                 StageNames.DEEP_REFLECTION,
-                "Reflection failed (using default)",
+                "Reflection fallback",
                 Map.of(
                     "contradictionFlag", false,
                     "followupAction", "proceed",

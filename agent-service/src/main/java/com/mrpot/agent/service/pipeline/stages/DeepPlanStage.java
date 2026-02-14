@@ -149,10 +149,19 @@ public class DeepPlanStage implements Processor<Void, SseEnvelope> {
         return createDoneEnvelope(context, plan, "complete");
     }
     
+    /**
+     * Create the done envelope for deep plan stage.
+     * This envelope is sent to the frontend with complete plan structure:
+     * - stage: "deep_plan_done" for frontend routing
+     * - subtasks array: for rendering as collapsible todo list
+     * - constraints array: for displaying planning constraints
+     * - successCriteria array: for displaying completion criteria
+     * - displayType: "todoList" to signal frontend UI component to use
+     */
     private SseEnvelope createDoneEnvelope(PipelineContext context, DeepPlan plan, String status) {
         return new SseEnvelope(
             StageNames.DEEP_PLAN_DONE,
-            "Plan created",
+            "Plan ready (" + plan.subtasks().size() + " subtasks)",
             Map.ofEntries(
                 Map.entry("status", status),
                 Map.entry("objective", truncate(plan.objective(), 100)),
@@ -177,11 +186,15 @@ public class DeepPlanStage implements Processor<Void, SseEnvelope> {
         
         return Mono.just(new SseEnvelope(
             StageNames.DEEP_PLAN_DONE,
-            "Plan created (fallback)",
+            "Plan fallback (" + reason + ")",
             Map.of(
                 "status", "fallback",
                 "reason", reason,
-                "subtaskCount", fallback.subtasks().size()
+                "subtaskCount", fallback.subtasks().size(),
+                "subtasks", fallback.subtasks(),
+                "constraints", fallback.constraints(),
+                "successCriteria", fallback.successCriteria(),
+                "displayType", "todoList"
             ),
             context.nextSeq(),
             System.currentTimeMillis(),

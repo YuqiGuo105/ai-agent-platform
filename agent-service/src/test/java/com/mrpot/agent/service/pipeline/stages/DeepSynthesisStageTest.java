@@ -171,9 +171,9 @@ class DeepSynthesisStageTest {
             .thenConsumeWhile(envelope -> true)
             .verifyComplete();
         
-        // Verify answer includes uncertainty declaration
+        // Verify answer includes unresolved claims section
         String finalAnswer = context.getFinalAnswer();
-        assertThat(finalAnswer).contains("Uncertainty Declaration");
+        assertThat(finalAnswer).contains("The following issues have not been fully resolved");
         assertThat(finalAnswer).contains("Claim 2 needs more evidence");
     }
     
@@ -190,7 +190,7 @@ class DeepSynthesisStageTest {
             .verifyComplete();
         
         // Should use default answer
-        assertThat(context.getFinalAnswer()).contains("DEEP mode answer");
+        assertThat(context.getFinalAnswer()).contains("I couldn't produce a complete deep synthesis");
     }
     
     @Test

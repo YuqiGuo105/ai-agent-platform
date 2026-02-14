@@ -103,7 +103,7 @@ public class DeepReasoningStage implements Processor<Void, SseEnvelope> {
                 
                 return Mono.just(new SseEnvelope(
                     StageNames.DEEP_REASONING_DONE,
-                    "Reasoning failed",
+                    "Reasoning fallback",
                     Map.of(
                         "status", "error",
                         "rounds", store.getReasoningStepCount(),
@@ -120,7 +120,7 @@ public class DeepReasoningStage implements Processor<Void, SseEnvelope> {
     private SseEnvelope createDoneEnvelope(PipelineContext context, ReasoningResult result) {
         return new SseEnvelope(
             StageNames.DEEP_REASONING_DONE,
-            "Reasoning complete",
+            "Reasoning done (" + result.steps().size() + " steps)",
             Map.of(
                 "status", "complete",
                 "rounds", result.steps().size(),

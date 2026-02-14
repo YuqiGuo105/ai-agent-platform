@@ -213,7 +213,7 @@ public class RagAnswerService {
     Flux<SseEnvelope> startEvent = Flux.just(
         SseEnvelope.builder()
             .stage(StageNames.FILE_EXTRACT_START)
-            .message("Extracting uploads")
+            .message("Extracting " + safeUrls.size() + " files")
             .payload(Map.of("fileCount", safeUrls.size(), "files", filenames))
             .seq(seq.incrementAndGet())
             .ts(System.currentTimeMillis())
@@ -226,7 +226,7 @@ public class RagAnswerService {
         .flatMapMany(files -> Flux.fromIterable(files)
             .map(fileItem -> SseEnvelope.builder()
                 .stage(StageNames.FILE_EXTRACT)
-                .message("Extracted: " + fileItem.filename())
+                .message("Processing: " + fileItem.filename())
                 .payload(Map.of(
                     "filename", fileItem.filename(),
                     "contentPreview", fileItem.text().length() > 100 ?
@@ -249,7 +249,7 @@ public class RagAnswerService {
           int totalFiles = files.size();
           return SseEnvelope.builder()
               .stage(StageNames.FILE_EXTRACT_DONE)
-              .message("File extraction complete")
+              .message("Extracted " + successfulFiles + "/" + totalFiles + " files")
               .payload(Map.of(
                   "totalFiles", totalFiles,
                   "successfulFiles", successfulFiles,

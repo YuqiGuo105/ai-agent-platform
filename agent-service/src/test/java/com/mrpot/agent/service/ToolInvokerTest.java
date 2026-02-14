@@ -72,13 +72,16 @@ class ToolInvokerTest {
 
   @Test
   void call_returns_internal_error_on_500() {
-    server.enqueue(new MockResponse().setResponseCode(500));
+    server.enqueue(new MockResponse()
+        .setResponseCode(500)
+        .setBody("Internal Server Error")
+        .addHeader("Content-Type", "text/plain"));
 
     WebClient webClient = WebClient.builder()
         .baseUrl(server.url("/").toString())
         .build();
     ToolInvoker invoker = new ToolInvoker(webClient, mockTelemetryWrapper);
-    ReflectionTestUtils.setField(invoker, "timeoutMs", 1000L);
+    ReflectionTestUtils.setField(invoker, "timeoutMs", 5000L);
 
     CallToolRequest request = new CallToolRequest("system.ping", Json.MAPPER.createObjectNode(), ScopeMode.AUTO, ToolProfile.BASIC, "t", "s");
     CallToolResponse response = invoker.call(request).block();

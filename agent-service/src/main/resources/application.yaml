@@ -29,7 +29,7 @@ spring:
   # === Redis (Railway Redis instance) ===
   data:
     redis:
-      url: ${REDIS_URL}
+      url: ${REDIS_URL:redis://localhost:6379}
       timeout: 3000
 
   cache:

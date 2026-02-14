@@ -67,7 +67,7 @@ public class DeepVerificationStage implements Processor<Void, SseEnvelope> {
             // Create SSE envelope
             return new SseEnvelope(
                 StageNames.DEEP_VERIFICATION,
-                "Verification complete",
+                "Verifying... score: " + String.format("%.2f", report.consistencyScore()),
                 Map.of(
                     "consistencyScore", report.consistencyScore(),
                     "contradictionCount", report.contradictions().size(),
@@ -89,7 +89,7 @@ public class DeepVerificationStage implements Processor<Void, SseEnvelope> {
             
             return Mono.just(new SseEnvelope(
                 StageNames.DEEP_VERIFICATION,
-                "Verification failed (using default)",
+                "Verification fallback",
                 Map.of(
                     "consistencyScore", 1.0,
                     "contradictionCount", 0,

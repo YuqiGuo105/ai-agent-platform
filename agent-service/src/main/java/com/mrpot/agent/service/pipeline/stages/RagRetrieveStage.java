@@ -79,8 +79,8 @@ public class RagRetrieveStage implements Processor<Void, SseEnvelope> {
                 
                 // Build display message from top result preview
                 String displayMessage = topResults.isEmpty()
-                    ? "No relevant results"
-                    : (String) topResults.get(0).get("preview");
+                    ? "Searching... no relevant docs"
+                    : "Searching... found " + hitCount + " docs";
 
                 // Create SSE envelope with RAG results and top document previews
                 return new SseEnvelope(

@@ -296,7 +296,7 @@ public class DeepToolOrchestrationStage implements Processor<Void, SseEnvelope> 
         
         return new SseEnvelope(
             StageNames.DEEP_TOOL_ORCH_DONE,
-            "Tool orchestration complete",
+            "Stage: Tool orchestration complete - " + successCount + " of " + results.size() + " tools succeeded",
             Map.of(
                 "toolCount", results.size(),
                 "successCount", successCount,
@@ -320,7 +320,7 @@ public class DeepToolOrchestrationStage implements Processor<Void, SseEnvelope> 
     private SseEnvelope createSkipEnvelope(PipelineContext context, String reason) {
         return new SseEnvelope(
             StageNames.DEEP_TOOL_ORCH_DONE,
-            "Tool orchestration skipped",
+            "Stage: Tool orchestration skipped (" + reason + ")",
             Map.of("skipped", true, "reason", reason),
             context.nextSeq(),
             System.currentTimeMillis(),
@@ -332,7 +332,7 @@ public class DeepToolOrchestrationStage implements Processor<Void, SseEnvelope> 
     private SseEnvelope createErrorEnvelope(PipelineContext context, String error) {
         return new SseEnvelope(
             StageNames.DEEP_TOOL_ORCH_DONE,
-            "Tool orchestration failed",
+            "Stage: Tool orchestration failed",
             Map.of("success", false, "error", error != null ? error : "Unknown error"),
             context.nextSeq(),
             System.currentTimeMillis(),

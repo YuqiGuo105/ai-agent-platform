@@ -54,7 +54,7 @@ public class ConversationSaveStage implements Processor<Void, SseEnvelope> {
                 // Return a save complete event (optional, won't be sent when configured as silent)
                 return new SseEnvelope(
                     StageNames.REDIS,
-                    "Conversation saved",
+                    "History saved",
                     Map.of(
                         "sessionId", sessionId,
                         "questionLength", question != null ? question.length() : 0,

@@ -60,7 +60,7 @@ class HistoryStageTest {
         StepVerifier.create(historyStage.process(null, context))
             .assertNext(envelope -> {
                 assertEquals(StageNames.REDIS, envelope.stage());
-                assertEquals("question", envelope.message());
+                assertEquals("History: 1 msgs", envelope.message());
                 
                 @SuppressWarnings("unchecked")
                 Map<String, Object> payload = (Map<String, Object>) envelope.payload();
@@ -108,7 +108,7 @@ class HistoryStageTest {
         StepVerifier.create(historyStage.process(null, context))
             .assertNext(envelope -> {
                 assertEquals(StageNames.REDIS, envelope.stage());
-                assertEquals("No history", envelope.message());
+                assertEquals("Stage: History retrieval failed (no messages)", envelope.message());
                 
                 @SuppressWarnings("unchecked")
                 Map<String, Object> payload = (Map<String, Object>) envelope.payload();

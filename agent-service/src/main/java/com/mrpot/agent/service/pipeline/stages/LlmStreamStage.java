@@ -21,6 +21,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -127,48 +129,134 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
         return Collections.emptyList();
     }
     
-    /** Pattern to strip echoed markers from the beginning of LLM output, including trailing newlines. */
-    private static final Pattern MARKER_PATTERN = Pattern.compile("^[\\s]*[【\\[](?:QA|KB|Q|FILE|HIS)[】\\]][\\s]*(?:\\r?\\n)*", Pattern.MULTILINE);
+    /**
+     * Pattern to strip echoed markers from the BEGINNING of LLM output only (start-anchored, no MULTILINE).
+     * Handles various marker formats:
+     * - Chinese brackets: 【QA】, 【KB】, etc.
+     * - ASCII brackets: [QA], [KB], [Conclusion], [Evidence Sources], [Uncertainty Declaration], etc.
+     * - Citation markers: :codex-terminal-citation[...]{...}【QA】etc.
+     * - Optional leading whitespace/newlines and trailing whitespace after markers
+     */
+    private static final Pattern LEADING_MARKER_PATTERN = Pattern.compile(
+        "^[\\s\\r\\n]*" +
+        "(?:" +
+            // Citation prefix like :codex-terminal-citation[...]{...}
+            ":?[a-z-]*citation[^\\]]*\\][^}]*\\}\\s*" +
+        ")?" +
+        "(?:" +
+            // Standard markers with Chinese or ASCII brackets
+            "[【\\[](?:QA|KB|Q|FILE|HIS|回答|Conclusion|Evidence Sources|Uncertainty Declaration)[】\\]]" +
+            "[\\s]*(?:\\r?\\n)*" +
+        ")*"
+    );
+
+    /**
+     * Pattern to detect partial/incomplete markers at the end of a chunk.
+     * Used to buffer text that might be part of a split marker.
+     */
+    private static final Pattern PARTIAL_MARKER_PATTERN = Pattern.compile(
+        "(?:" +
+            ":?[a-z-]*citation[^\\]]*$" +  // Incomplete citation
+            "|\\][^}]*$" +                   // Citation bracket closed but braces incomplete
+            "|[【\\[][^】\\]]*$" +             // Incomplete bracket marker
+        ")"
+    );
+
+    /**
+     * Pattern to match markers anywhere in text (for cleaning response content).
+     * Matches markers like [QA], [Conclusion], [Evidence Sources], [Uncertainty Declaration], etc.
+     */
+    private static final Pattern INLINE_MARKER_PATTERN = Pattern.compile(
+        "[【\\[](?:QA|KB|Q|FILE|HIS|回答|Conclusion|Evidence Sources|Uncertainty Declaration)[】\\]]\\s*(?:\\r?\\n)?",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    /**
+     * Strip leading markers from the beginning of text.
+     * This is a reusable helper for both per-chunk streaming and final-answer persistence.
+     *
+     * @param text the text to process
+     * @return text with leading markers removed
+     */
+    private static String stripLeadingMarkers(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        // Use start-anchored pattern (no MULTILINE) to only strip from the beginning
+        String result = LEADING_MARKER_PATTERN.matcher(text).replaceFirst("");
+        // Also strip any remaining leading whitespace until real content
+        return result.replaceFirst("^[\\s\\n\\r]*", "");
+    }
 
     /**
      * Stream the LLM response using Spring AI ChatClient.
-     * Strips any echoed section markers from the output.
+     * Strips any echoed section markers from the output, including markers split across chunks.
      */
     private Flux<SseEnvelope> streamLlmResponse(String prompt, List<ChatMessage> history, PipelineContext context) {
         StringBuilder fullAnswer = new StringBuilder();
         AtomicBoolean leadingStripped = new AtomicBoolean(false);
+        // Buffer to accumulate text that might contain split markers at the beginning
+        AtomicReference<StringBuilder> leadingBuffer = new AtomicReference<>(new StringBuilder());
         
         // Pass execution mode to LlmService - FAST mode uses humorous tone
         return llmService.streamResponse(prompt, history, context.executionMode())
             .map(chunk -> {
                 String cleaned = chunk;
-                // Strip markers and leading whitespace from chunks before real content starts
+                
+                // Handle leading markers that may be split across chunks
                 if (!leadingStripped.get()) {
-                    cleaned = MARKER_PATTERN.matcher(cleaned).replaceAll("");
-                    // Also strip any leading whitespace/newlines until real content appears
-                    cleaned = cleaned.replaceFirst("^[\\s\\n\\r]*", "");
+                    StringBuilder buffer = leadingBuffer.get();
+                    buffer.append(chunk);
+                    String buffered = buffer.toString();
+                    
+                    // Check if buffer might contain a partial marker at the end
+                    Matcher partialMatcher = PARTIAL_MARKER_PATTERN.matcher(buffered);
+                    if (partialMatcher.find() && buffered.length() < 200) {
+                        // Partial marker detected, wait for more chunks (but not indefinitely)
+                        return "";
+                    }
+                    
+                    // No partial marker or buffer is large enough - process the buffer
+                    cleaned = stripLeadingMarkers(buffered);
+                    
                     if (!cleaned.isEmpty()) {
                         leadingStripped.set(true);
+                        leadingBuffer.set(new StringBuilder()); // Clear buffer
+                    } else {
+                        // Buffer was entirely markers, reset it
+                        leadingBuffer.set(new StringBuilder());
+                        return "";
                     }
                 }
+                
+                // Remove any inline markers like [Conclusion], [QA], etc. from all chunks
+                cleaned = INLINE_MARKER_PATTERN.matcher(cleaned).replaceAll("");
                 fullAnswer.append(cleaned);
                 
-                return new SseEnvelope(
-                    StageNames.ANSWER_DELTA,
-                    cleaned,
-                    Map.of("delta", cleaned),
-                    context.nextSeq(),
-                    System.currentTimeMillis(),
-                    context.traceId(),
-                    context.sessionId()
-                );
+                return cleaned;
             })
-            .filter(envelope -> !envelope.message().isEmpty())
+            .filter(text -> text != null && !text.isEmpty())
+            .map(cleaned -> new SseEnvelope(
+                StageNames.ANSWER_DELTA,
+                cleaned,
+                Map.of("delta", cleaned),
+                context.nextSeq(),
+                System.currentTimeMillis(),
+                context.traceId(),
+                context.sessionId()
+            ))
             .doOnComplete(() -> {
-                // Store final answer in context, stripping any remaining markers
-                String finalAnswer = fullAnswer.toString();
-                finalAnswer = MARKER_PATTERN.matcher(finalAnswer).replaceAll("");
-                finalAnswer = finalAnswer.replaceFirst("^[\\s\\n\\r]+", "");
+                // Flush any remaining buffer content
+                StringBuilder buffer = leadingBuffer.get();
+                if (buffer.length() > 0 && !leadingStripped.get()) {
+                    String remaining = stripLeadingMarkers(buffer.toString());
+                    remaining = INLINE_MARKER_PATTERN.matcher(remaining).replaceAll("");
+                    fullAnswer.append(remaining);
+                }
+                
+                // Store final answer in context using the same stripLeadingMarkers helper
+                String finalAnswer = stripLeadingMarkers(fullAnswer.toString());
+                finalAnswer = INLINE_MARKER_PATTERN.matcher(finalAnswer).replaceAll("");
                 context.setFinalAnswer(finalAnswer);
                 log.debug("LLM streaming complete: answerLength={} for runId={}",
                     finalAnswer.length(), context.runId());

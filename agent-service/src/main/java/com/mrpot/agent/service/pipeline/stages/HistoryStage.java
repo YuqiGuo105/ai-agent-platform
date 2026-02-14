@@ -55,7 +55,7 @@ public class HistoryStage implements Processor<Void, SseEnvelope> {
                 // Build display message from recent questions
                 String displayMessage = recentQuestions.isEmpty()
                     ? "No history"
-                    : String.join(", ", recentQuestions);
+                    : "History: " + recentQuestions.size() + " msgs";
 
                 // Create SSE envelope with history retrieval result
                 return new SseEnvelope(
@@ -82,7 +82,7 @@ public class HistoryStage implements Processor<Void, SseEnvelope> {
                 // Return a non-blocking error indicator
                 return Mono.just(new SseEnvelope(
                     StageNames.REDIS,
-                    "No history",
+                    "Stage: History retrieval failed (no messages)",
                     Map.of(
                         "historyCount", 0,
                         "error", e.getMessage() != null ? e.getMessage() : "Unknown error",

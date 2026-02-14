@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 @Slf4j
 public class DeepSynthesisStage implements Processor<Void, Flux<SseEnvelope>> {
     
-    private static final String DEFAULT_DEEP_ANSWER = "DEEP mode answer";
+    private static final String DEFAULT_DEEP_ANSWER = "I couldn't produce a complete deep synthesis for this question. Please try again.";
     
     // Target characters per second for streaming (controls visual speed)
     private static final int CHARS_PER_SECOND = 80;
@@ -133,7 +133,7 @@ public class DeepSynthesisStage implements Processor<Void, Flux<SseEnvelope>> {
             // Create deferred deep_synthesis event - seq number assigned after all answer_delta events
             Flux<SseEnvelope> synthesisEvent = Flux.defer(() -> Flux.just(new SseEnvelope(
                 StageNames.DEEP_SYNTHESIS,
-                "Synthesis complete",
+                "Combining... (" + finalUnresolvedClaims.size() + " unresolved)",
                 Map.of(
                     "round", context.getCurrentRound(),
                     "status", "complete",
@@ -343,27 +343,25 @@ public class DeepSynthesisStage implements Processor<Void, Flux<SseEnvelope>> {
     
     /**
      * Build the structured final answer.
+     * Note: All markers are removed since the frontend uses structured UI blocks.
      */
     private String buildFinalAnswer(String conclusion, List<String> evidenceSources, List<String> unresolvedClaims) {
         StringBuilder answer = new StringBuilder();
         
-        // Conclusion section
-        answer.append("[Conclusion]\n");
+        // Conclusion section with marker
         answer.append(conclusion);
-        answer.append("\n\n");
         
-        // Evidence sources section
+        // Evidence sources section (no marker, just content)
         if (!evidenceSources.isEmpty()) {
-            answer.append("[Evidence Sources]\n");
+            answer.append("\n\n");
             for (int i = 0; i < evidenceSources.size(); i++) {
                 answer.append("- Source ").append(i + 1).append(": ").append(evidenceSources.get(i)).append("\n");
             }
-            answer.append("\n");
         }
         
-        // Uncertainty declaration section
+        // Uncertainty declaration section (no marker, just content)
         if (!unresolvedClaims.isEmpty()) {
-            answer.append("[Uncertainty Declaration]\n");
+            answer.append("\n");
             answer.append("The following issues have not been fully resolved:\n");
             for (String claim : unresolvedClaims) {
                 answer.append("- ").append(claim).append("\n");
