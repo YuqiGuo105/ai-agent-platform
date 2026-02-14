@@ -1,0 +1,52 @@
+# Prometheus Configuration for AI Agent Platform
+# ================================================
+
+global:
+  scrape_interval: 15s      # How frequently to scrape targets
+  evaluation_interval: 15s  # How frequently to evaluate rules
+  scrape_timeout: 10s       # Timeout for scraping targets
+
+# Alertmanager configuration (optional, for future use)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rule files (optional, for future alerts)
+rule_files: []
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /metrics
+
+  # Agent Service - Main orchestration service
+  - job_name: 'agent-service'
+    static_configs:
+      - targets: ['agent-service:8080']
+    metrics_path: /actuator/prometheus
+    scrape_interval: 15s
+
+  # Agent Tools Service - Tool execution service
+  - job_name: 'agent-tools-service'
+    static_configs:
+      - targets: ['agent-tools-service:8081']
+    metrics_path: /actuator/prometheus
+    scrape_interval: 15s
+
+  # Agent Telemetry Service - Telemetry and monitoring service
+  - job_name: 'agent-telemetry-service'
+    static_configs:
+      - targets: ['agent-telemetry-service:8082']
+    metrics_path: /actuator/prometheus
+    scrape_interval: 15s
+
+  # Agent Knowledge Service - Knowledge base service
+  - job_name: 'agent-knowledge'
+    static_configs:
+      - targets: ['agent-knowledge:8083']
+    metrics_path: /actuator/prometheus
+    scrape_interval: 15s

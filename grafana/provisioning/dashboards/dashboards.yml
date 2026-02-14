@@ -1,0 +1,16 @@
+# Grafana Dashboard Provisioning
+# ===============================
+# This file configures dashboard providers
+
+apiVersion: 1
+
+providers:
+  - name: 'AI Agent Platform Dashboards'
+    orgId: 1
+    folder: 'AI Agent Platform'
+    folderUid: 'ai-agent-platform'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

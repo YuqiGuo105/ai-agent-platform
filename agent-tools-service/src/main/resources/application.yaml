@@ -64,3 +64,13 @@ springdoc:
   api-docs:
     path: /v3/api-docs
     enabled: true
+
+# === Actuator ===
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
