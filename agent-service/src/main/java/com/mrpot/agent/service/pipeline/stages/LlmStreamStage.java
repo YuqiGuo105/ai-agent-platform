@@ -128,7 +128,7 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
     }
     
     /** Pattern to strip echoed markers from the beginning of LLM output, including trailing newlines. */
-    private static final Pattern MARKER_PATTERN = Pattern.compile("^[\\s]*[【\\[](?:QA|KB|Q|FILE|HIS)[】\\]][\\s]*(?:\\r?\\n)*", Pattern.MULTILINE);
+    private static final Pattern MARKER_PATTERN = Pattern.compile("^[\\s]*[【\\[](?:QA|KB|Q|FILE|HIS)[】\\]][\\s]*(?:\\r?\\n)*");
 
     /**
      * Stream the LLM response using Spring AI ChatClient.
@@ -137,18 +137,19 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
     private Flux<SseEnvelope> streamLlmResponse(String prompt, List<ChatMessage> history, PipelineContext context) {
         StringBuilder fullAnswer = new StringBuilder();
         AtomicBoolean leadingStripped = new AtomicBoolean(false);
+        StringBuilder leadingBuffer = new StringBuilder();
         
         // Pass execution mode to LlmService - FAST mode uses humorous tone
         return llmService.streamResponse(prompt, history, context.executionMode())
             .map(chunk -> {
                 String cleaned = chunk;
-                // Strip markers and leading whitespace from chunks before real content starts
+                // Buffer initial chunks so split markers like "【" + "QA" + "】" are stripped reliably.
                 if (!leadingStripped.get()) {
-                    cleaned = MARKER_PATTERN.matcher(cleaned).replaceAll("");
-                    // Also strip any leading whitespace/newlines until real content appears
-                    cleaned = cleaned.replaceFirst("^[\\s\\n\\r]*", "");
+                    leadingBuffer.append(chunk);
+                    cleaned = stripLeadingMarkers(leadingBuffer.toString());
                     if (!cleaned.isEmpty()) {
                         leadingStripped.set(true);
+                        leadingBuffer.setLength(0);
                     }
                 }
                 fullAnswer.append(cleaned);
@@ -166,9 +167,7 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
             .filter(envelope -> !envelope.message().isEmpty())
             .doOnComplete(() -> {
                 // Store final answer in context, stripping any remaining markers
-                String finalAnswer = fullAnswer.toString();
-                finalAnswer = MARKER_PATTERN.matcher(finalAnswer).replaceAll("");
-                finalAnswer = finalAnswer.replaceFirst("^[\\s\\n\\r]+", "");
+                String finalAnswer = stripLeadingMarkers(fullAnswer.toString());
                 context.setFinalAnswer(finalAnswer);
                 log.debug("LLM streaming complete: answerLength={} for runId={}",
                     finalAnswer.length(), context.runId());
@@ -177,6 +176,16 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
                 log.error("LLM service error, falling back to simulated response: {}", e.getMessage());
                 return streamFallbackResponse(context);
             });
+    }
+
+    private String stripLeadingMarkers(String text) {
+        String stripped = text;
+        String previous;
+        do {
+            previous = stripped;
+            stripped = MARKER_PATTERN.matcher(stripped).replaceFirst("");
+        } while (!stripped.equals(previous));
+        return stripped.replaceFirst("^[\\s\\n\\r]+", "");
     }
     
     /**
