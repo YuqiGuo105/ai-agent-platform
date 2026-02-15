@@ -2,15 +2,38 @@ spring:
   application:
     name: agent-knowledge
 
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      embedding:
+        options:
+          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+          dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:1536}
+
   datasource:
-    url: ${DB_URL:jdbc:postgresql://centerbeam.proxy.rlwy.net:27055/railway}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:xP0_dhCBdKIyWtZlMYZx2Sdn9BXEYKj~}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 30000
+
+  # === RabbitMQ (for telemetry events) ===
+  rabbitmq:
+    addresses: ${RABBITMQ_URL}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASS}
+
+  # === Redis (Railway Redis instance) ===
+  data:
+    redis:
+      url: ${REDIS_URL}
+      timeout: 3000
+
+  cache:
+    type: redis
 
 server:
   port: ${PORT:8083}
@@ -43,17 +66,16 @@ logging:
     com.mrpot.agent.knowledge: DEBUG
     org.springframework.jdbc: DEBUG
 
-# === RabbitMQ (for telemetry events) ===
-  rabbitmq:
-    addresses: ${RABBITMQ_URL:amqp://rA1koa84s5cFXUdV:SVDGsbiozPydd2YFq4MN5.o3RCsXRBra@switchyard.proxy.rlwy.net:30926}
-    username: ${RABBITMQ_USER:rA1koa84s5cFXUdV}
-    password: ${RABBITMQ_PASS:SVDGsbiozPydd2YFq4MN5.o3RCsXRBra}
+storage:
+  s3:
+    endpoint: ${S3_ENDPOINT:https://t3.storageapi.dev}
+    region: ${S3_REGION:auto}
+    bucket: ${S3_BUCKET}
+    access-key: ${S3_ACCESS_KEY}
+    secret-key: ${S3_SECRET_KEY}
+    presign-ttl-seconds: ${S3_PRESIGN_TTL_SECONDS:900}
+    path-style: ${S3_PATH_STYLE:true}
 
-  # === Redis (Railway Redis instance) ===
-  data:
-    redis:
-      url: ${REDIS_URL}
-      timeout: 3000
-
-  cache:
-    type: redis
+mcp:
+  tools:
+    base-url: ${TOOLS_SERVICE_URL:http://localhost:8081}

@@ -1,0 +1,48 @@
+.chunk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chunk-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.chunk-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.pill {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+}
+
+.pill.muted { color: #cbd5e1; }
+
+.chunk-content {
+  margin-top: 10px;
+  max-height: 120px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  color: #000000;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.chunk-content.open { max-height: none; }
+
+.link-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #93c5fd;
+  cursor: pointer;
+}

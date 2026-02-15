@@ -1,9 +1,10 @@
 package com.mrpot.agent.knowledge.controller;
 
 import com.mrpot.agent.common.kb.KbDocument;
-import com.mrpot.agent.knowledge.model.FuzzySearchRequest;
-import com.mrpot.agent.knowledge.model.PagedResponse;
+import com.mrpot.agent.knowledge.model.*;
 import com.mrpot.agent.knowledge.service.KbManagementService;
+import com.mrpot.agent.knowledge.service.KbUploadService;
+import com.mrpot.agent.knowledge.service.S3StorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -26,6 +27,8 @@ import java.util.Map;
 public class KbController {
 
     private final KbManagementService kbManagementService;
+    private final KbUploadService kbUploadService;
+    private final S3StorageService s3StorageService;
 
     // ─── GET /kb/documents ──────────────────────────────────────────
     @GetMapping("/documents")
@@ -126,5 +129,78 @@ public class KbController {
                 request.resolveSize()
         );
         return ResponseEntity.ok(results);
+    }
+
+    // ─── POST /kb/upload/presign ───────────────────────────────────
+    @PostMapping("/upload/presign")
+    @Operation(summary = "Create presigned upload URL",
+            description = "Generates a temporary S3 upload URL so the frontend can upload without exposing credentials")
+    public ResponseEntity<PresignUploadResponse> presignUpload(@RequestBody PresignUploadRequest request) {
+        var presigned = s3StorageService.presignUpload(request.filename(), request.contentType());
+        PresignUploadResponse response = new PresignUploadResponse(
+                presigned.method(),
+            presigned.uploadUrl(),
+                presigned.fileUrl(),
+                presigned.objectKey(),
+                s3StorageService.getBucket()
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    // ─── GET /kb/download/presign ──────────────────────────────────
+    @GetMapping("/download/presign")
+    @Operation(summary = "Create presigned download URL",
+            description = "Generates a temporary S3 download URL for accessing private objects")
+    public ResponseEntity<Map<String, Object>> presignDownload(
+            @Parameter(description = "S3 object key or file URL")
+            @RequestParam String fileUrl) {
+        try {
+            var presigned = s3StorageService.presignDownloadByUrl(fileUrl);
+            return ResponseEntity.ok(Map.of(
+                    "downloadUrl", presigned.downloadUrl(),
+                    "objectKey", presigned.objectKey(),
+                    "expiresInSeconds", presigned.expiresInSeconds()
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ─── POST /kb/upload (file URL) ────────────────────────────────
+    @PostMapping("/upload")
+    @Operation(summary = "Upload document and generate RAG chunks",
+            description = "Accepts file URL, extracts content, chunks it, and returns chunk previews")
+    public ResponseEntity<ChunkPreviewResponse> uploadDocument(@RequestBody UploadRequest request) {
+        try {
+            ChunkPreviewResponse response = kbUploadService.processFileUpload(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // ─── POST /kb/upload/text ──────────────────────────────────────
+    @PostMapping("/upload/text")
+    @Operation(summary = "Upload plain text and generate RAG chunks",
+            description = "Chunks provided text directly without file processing")
+    public ResponseEntity<ChunkPreviewResponse> uploadText(@RequestBody TextUploadRequest request) {
+        try {
+            ChunkPreviewResponse response = kbUploadService.processTextUpload(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // ─── POST /kb/upload/save ──────────────────────────────────────
+    @PostMapping("/upload/save")
+    @Operation(summary = "Persist reviewed chunks",
+            description = "Saves generated chunk embeddings into kb_documents")
+    public ResponseEntity<Map<String, Object>> saveChunks(@RequestBody SaveChunksRequest request) {
+        List<Long> ids = kbUploadService.saveChunks(request);
+        return ResponseEntity.ok(Map.of(
+                "saved", ids.size(),
+                "ids", ids
+        ));
     }
 }

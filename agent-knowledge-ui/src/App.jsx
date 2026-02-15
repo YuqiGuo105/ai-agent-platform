@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
+import UploadPage from './pages/UploadPage';
 import RunLogsDashboard from './pages/telemetry/RunLogsDashboard';
 import RunDetailView from './pages/telemetry/RunDetailView';
 import DlqMonitor from './pages/telemetry/DlqMonitor';
@@ -20,6 +21,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <HomePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/upload"
+            element={
+              <ProtectedRoute>
+                <UploadPage />
               </ProtectedRoute>
             }
           />

@@ -3,6 +3,7 @@ package com.mrpot.agent.knowledge.repository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mrpot.agent.common.kb.KbDocument;
+import com.pgvector.PGvector;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -122,6 +123,36 @@ public class KbDocumentRepository {
     public long count() {
         Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM kb_documents", Long.class);
         return count != null ? count : 0;
+    }
+
+    // ─── Insert document ───────────────────────────────────────────
+    public Long insert(String docType, String content, Map<String, Object> metadata, float[] embedding) {
+        String sql = """
+                INSERT INTO kb_documents (doc_type, content, metadata, embedding)
+                VALUES (?, ?, ?::jsonb, ?::vector)
+                RETURNING id
+                """;
+
+        String metadataJson = null;
+        try {
+            if (metadata != null) {
+                metadataJson = objectMapper.writeValueAsString(metadata);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to serialize metadata, storing null: {}", e.getMessage());
+        }
+
+        PGvector vector = new PGvector(embedding);
+        Long id = jdbcTemplate.queryForObject(
+            sql,
+            new Object[]{docType, content, metadataJson, vector},
+            Long.class
+        );
+
+        if (id == null) {
+            throw new IllegalStateException("Insert returned null id");
+        }
+        return id;
     }
 
     // ─── Row Mapper ─────────────────────────────────────────────────

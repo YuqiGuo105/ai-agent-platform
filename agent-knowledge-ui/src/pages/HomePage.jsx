@@ -17,6 +17,7 @@ export default function HomePage() {
   const [totalElements, setTotalElements] = useState(0);
   const [expandedRows, setExpandedRows] = useState([]);
   const [jumpPage, setJumpPage] = useState('');
+
   // Fetch KB documents from backend
   useEffect(() => {
     async function fetchDocuments() {
@@ -146,6 +147,13 @@ export default function HomePage() {
             title="View Run Logs"
           >
             📊 Run Logs
+          </Link>
+          <Link
+            to="/upload"
+            className="btn-logs"
+            title="Upload new knowledge"
+          >
+            📤 Upload
           </Link>
           <button className="btn-logout" onClick={logout}>
             Sign Out

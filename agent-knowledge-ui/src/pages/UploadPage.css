@@ -1,0 +1,237 @@
+.upload-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f172a 0%, #111827 40%, #0b1220 100%);
+  color: #e5e7eb;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 32px;
+  background: rgba(15, 23, 42, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.topbar-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.topbar-link {
+  margin-left: 12px;
+  color: #93c5fd;
+  text-decoration: none;
+}
+
+.topbar-right {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.user-label {
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.btn-logout,
+.btn-logs {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e5e7eb;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.upload-main {
+  max-width: 1080px;
+  margin: 30px auto;
+  padding: 0 18px 48px;
+}
+
+.card {
+  background: rgba(17, 24, 39, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.mode-toggle button {
+  margin-right: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.mode-toggle button.active {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.actions .ghost,
+.actions .primary {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.actions .primary {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  border: none;
+}
+
+.upload-body {
+  margin-bottom: 12px;
+}
+
+.dropzone {
+  width: 100%;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 22px;
+  text-align: center;
+  cursor: pointer;
+  display: block;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dropzone input {
+  display: none;
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(37, 99, 235, 0.18);
+  border-radius: 10px;
+  color: #dbeafe;
+}
+
+textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.95);
+  color: #000000;
+  padding: 10px;
+  resize: vertical;
+}
+
+.metadata-block {
+  margin-top: 10px;
+}
+
+.metadata-block label {
+  display: block;
+  margin-bottom: 6px;
+  color: #cbd5e1;
+}
+
+.banner {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.banner.error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fecdd3;
+}
+
+.banner.success {
+  background: rgba(34, 197, 94, 0.12);
+  color: #bbf7d0;
+}
+
+.eyebrow {
+  font-size: 12px;
+  color: #94a3b8;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.chunk-list {
+  margin-top: 8px;
+}
+
+.chunk-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.chunk-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.pill {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+}
+
+.pill.muted { color: #cbd5e1; }
+
+.chunk-content {
+  margin-top: 10px;
+  max-height: 100px;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+
+.chunk-content.open {
+  max-height: none;
+}
+
+.link-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #93c5fd;
+  cursor: pointer;
+}
+
+.primary:disabled,
+.ghost:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .card-header { flex-direction: column; align-items: flex-start; }
+  .topbar { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .actions { width: 100%; justify-content: flex-end; }
+}
