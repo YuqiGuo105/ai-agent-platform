@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import UploadPage from './pages/UploadPage';
+import PortfolioPage from './pages/PortfolioPage';
 import RunLogsDashboard from './pages/telemetry/RunLogsDashboard';
 import RunDetailView from './pages/telemetry/RunDetailView';
 import DlqMonitor from './pages/telemetry/DlqMonitor';
@@ -29,6 +30,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <UploadPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/portfolio"
+            element={
+              <ProtectedRoute>
+                <PortfolioPage />
               </ProtectedRoute>
             }
           />

@@ -1,0 +1,701 @@
+/* ─── Portfolio Page Styles ─────────────────────────────────── */
+.portfolio-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+/* ─── Top bar (matches HomePage) ─────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  background: #fff;
+  border-bottom: 1px solid #e9ecef;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-label {
+  font-size: 0.875rem;
+  color: #495057;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.btn-nav {
+  background: #3b82f6;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: white;
+  text-decoration: none;
+  transition: background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.btn-nav:hover {
+  background: #2563eb;
+}
+
+.btn-logout {
+  background: none;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: #495057;
+  transition: background 0.15s;
+}
+
+.btn-logout:hover {
+  background: #f1f3f5;
+}
+
+/* ─── Main content area ─────────────────────────────────────── */
+.portfolio-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* ─── Hero Section ──────────────────────────────────────────── */
+.portfolio-hero {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 3rem 2.5rem;
+  margin-bottom: 2rem;
+  color: white;
+  box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+}
+
+.hero-content h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.hero-subtitle {
+  font-size: 1.1rem;
+  opacity: 0.95;
+  max-width: 700px;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.hero-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.feature-badge {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.4rem 0.9rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  backdrop-filter: blur(10px);
+}
+
+.hero-link {
+  display: inline-block;
+  background: white;
+  color: #667eea;
+  padding: 0.7rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.hero-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ─── Tab Navigation ────────────────────────────────────────── */
+.tab-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  background: white;
+  padding: 0.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #495057;
+  transition: all 0.15s;
+}
+
+.tab-btn:hover {
+  background: #f1f3f5;
+}
+
+.tab-btn.active {
+  background: #3b82f6;
+  color: white;
+}
+
+/* ─── Section Styles ────────────────────────────────────────── */
+.portfolio-section {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.portfolio-section h2 {
+  font-size: 1.5rem;
+  color: #1a1a2e;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.portfolio-section h3 {
+  font-size: 1.15rem;
+  color: #1a1a2e;
+  margin-bottom: 1rem;
+}
+
+.section-intro {
+  color: #6c757d;
+  margin-bottom: 1.5rem;
+}
+
+/* ─── Overview Grid ─────────────────────────────────────────── */
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.audience-card {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 1.5rem;
+  border: 1px solid #e9ecef;
+}
+
+.audience-card h3 {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  color: #1a1a2e;
+}
+
+.audience-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.audience-card li {
+  padding: 0.4rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+  color: #495057;
+}
+
+.audience-card li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #22c55e;
+  font-weight: 600;
+}
+
+/* ─── Capabilities Grid ─────────────────────────────────────── */
+.capabilities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.capability-card {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 1.25rem;
+  border: 1px solid #e9ecef;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.capability-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.capability-icon {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.capability-card h4 {
+  font-size: 1rem;
+  color: #1a1a2e;
+  margin-bottom: 0.5rem;
+}
+
+.capability-card p {
+  font-size: 0.875rem;
+  color: #6c757d;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ─── Architecture Diagram ──────────────────────────────────── */
+.architecture-diagram {
+  background: #1a1a2e;
+  border-radius: 10px;
+  padding: 1.5rem;
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+}
+
+.architecture-diagram pre {
+  color: #a3e635;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  margin: 0;
+  white-space: pre;
+}
+
+.architecture-notes {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 1.5rem;
+}
+
+.architecture-notes h3 {
+  margin-top: 0;
+}
+
+.architecture-notes ul {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.architecture-notes li {
+  padding: 0.3rem 0;
+  color: #495057;
+}
+
+/* ─── Systems Accordion ─────────────────────────────────────── */
+.systems-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.system-item {
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.system-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: #f8f9fa;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.system-header:hover {
+  background: #e9ecef;
+}
+
+.system-header.expanded {
+  background: #e9ecef;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.system-icon {
+  font-size: 1.5rem;
+}
+
+.system-title {
+  flex: 1;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.system-toggle {
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+
+.system-content {
+  padding: 1.25rem;
+  background: white;
+}
+
+.system-desc {
+  color: #495057;
+  margin-bottom: 1rem;
+}
+
+.system-features {
+  margin-bottom: 1rem;
+}
+
+.system-features h4 {
+  font-size: 0.95rem;
+  color: #1a1a2e;
+  margin-bottom: 0.5rem;
+}
+
+.system-features ul {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.system-features li {
+  padding: 0.25rem 0;
+  color: #495057;
+  font-size: 0.9rem;
+}
+
+.system-table-wrap {
+  margin-top: 1rem;
+}
+
+.system-table-wrap h4 {
+  font-size: 0.95rem;
+  color: #1a1a2e;
+  margin-bottom: 0.5rem;
+}
+
+.system-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.system-table th,
+.system-table td {
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.system-table th {
+  background: #f1f3f5;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.system-table code {
+  background: #e9ecef;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #e03131;
+}
+
+/* ─── API Table ─────────────────────────────────────────────── */
+.api-table-wrap {
+  overflow-x: auto;
+}
+
+.api-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  min-width: 600px;
+}
+
+.api-table th,
+.api-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.api-table th {
+  background: #f1f3f5;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.api-table code {
+  background: #e9ecef;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #1a1a2e;
+}
+
+.method-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.method-get {
+  background: #d3f9d8;
+  color: #087f5b;
+}
+
+.method-post {
+  background: #d0ebff;
+  color: #1864ab;
+}
+
+/* ─── Tech Stack Grid ───────────────────────────────────────── */
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.tech-card {
+  display: flex;
+  flex-direction: column;
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  border: 1px solid #e9ecef;
+}
+
+.tech-category {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6c757d;
+  margin-bottom: 0.25rem;
+}
+
+.tech-name {
+  font-size: 0.95rem;
+  color: #1a1a2e;
+}
+
+/* ─── Setup Steps ───────────────────────────────────────────── */
+.setup-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.setup-step {
+  display: flex;
+  gap: 1rem;
+}
+
+.step-number {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-content h4 {
+  font-size: 1.05rem;
+  color: #1a1a2e;
+  margin-bottom: 0.5rem;
+}
+
+.step-content ul,
+.step-content ol {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #495057;
+}
+
+.step-content li {
+  padding: 0.2rem 0;
+}
+
+.step-content code {
+  background: #e9ecef;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.code-block {
+  background: #1a1a2e;
+  color: #a3e635;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  margin: 0;
+}
+
+/* ─── Environment Variables Table ───────────────────────────── */
+.env-table-wrap {
+  overflow-x: auto;
+}
+
+.env-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.env-table th,
+.env-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.env-table th {
+  background: #f1f3f5;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.env-table code {
+  background: #e9ecef;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #1a1a2e;
+}
+
+.required-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.required-badge.yes {
+  background: #ffe3e3;
+  color: #c92a2a;
+}
+
+.required-badge.no {
+  background: #d3f9d8;
+  color: #087f5b;
+}
+
+/* ─── Footer ────────────────────────────────────────────────── */
+.portfolio-footer {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+
+/* ─── Responsive ────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .portfolio-hero {
+    padding: 2rem 1.5rem;
+  }
+
+  .hero-content h1 {
+    font-size: 1.75rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+  }
+
+  .tab-nav {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .portfolio-section {
+    padding: 1.5rem;
+  }
+
+  .portfolio-section h2 {
+    font-size: 1.25rem;
+  }
+
+  .setup-step {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .architecture-diagram pre {
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .portfolio-main {
+    padding: 1rem;
+  }
+
+  .portfolio-hero {
+    padding: 1.5rem 1rem;
+  }
+
+  .hero-content h1 {
+    font-size: 1.5rem;
+  }
+
+  .feature-badge {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
+  }
+}

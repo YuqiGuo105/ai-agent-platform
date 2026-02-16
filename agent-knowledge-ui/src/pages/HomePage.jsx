@@ -149,6 +149,13 @@ export default function HomePage() {
             📊 Run Logs
           </Link>
           <Link
+            to="/portfolio"
+            className="btn-logs"
+            title="View Portfolio"
+          >
+            🎨 Portfolio
+          </Link>
+          <Link
             to="/upload"
             className="btn-logs"
             title="Upload new knowledge"
