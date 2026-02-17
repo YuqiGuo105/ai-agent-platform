@@ -4,6 +4,15 @@ A multi-module Spring Boot platform for building AI-powered agents with RAG (Ret
 
 ---
 
+## Demo
+
+https://github.com/user-attachments/assets/beecf647-26e2-4185-85ee-2d8847284b84
+
+
+
+
+---
+
 ## Architecture
 
 ![Architecture Diagram](architecture_diagram.png)
