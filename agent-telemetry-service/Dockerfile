@@ -57,7 +57,7 @@ EXPOSE 8080
 
 # Health check (uses PORT env var set by Railway)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/actuator/health || exit 1
+    CMD sh -c "wget --no-verbose --tries=1 --spider http://localhost:\${PORT:-8080}/actuator/health || exit 1"
 
 # Run the application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar app.jar"]

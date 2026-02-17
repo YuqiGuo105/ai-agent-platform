@@ -36,7 +36,7 @@ spring:
     type: redis
 
 server:
-  port: ${PORT:8083}
+  port: ${PORT:8080}
 
 springdoc:
   swagger-ui:
