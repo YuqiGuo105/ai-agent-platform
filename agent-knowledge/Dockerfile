@@ -52,12 +52,12 @@ USER appuser
 ENV JAVA_OPTS="-Xms256m -Xmx512m" \
     SPRING_PROFILES_ACTIVE="docker"
 
-# Expose port
+# Expose port (documentation only - Railway uses PORT env var)
 EXPOSE 8083
 
-# Health check
+# Health check - uses PORT env var set by Railway, falls back to 8083
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8083/actuator/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8083}/actuator/health || exit 1
 
 # Run the application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar app.jar"]
