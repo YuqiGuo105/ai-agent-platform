@@ -35,11 +35,7 @@ function App() {
           />
           <Route
             path="/portfolio"
-            element={
-              <ProtectedRoute>
-                <PortfolioPage />
-              </ProtectedRoute>
-            }
+            element={<PortfolioPage />}
           />
           <Route
             path="/telemetry"
