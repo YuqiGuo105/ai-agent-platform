@@ -117,6 +117,7 @@ const storageEnv = [
 export default function PortfolioPage() {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+  const [expandedSystems, setExpandedSystems] = useState([]);
 
   function toggleSystem(id) {
     setExpandedSystems(prev =>
