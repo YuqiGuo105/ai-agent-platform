@@ -26,32 +26,58 @@ A production-ready, multi-module Spring Boot platform for building AI-powered ag
 
 ## Architecture
 
-```
-                          +----------------------------+
-                          |    agent-knowledge-ui      |
-                          |     (Frontend / React)     |
-                          +-------------+--------------+
-                                        | HTTP
-                                        v
-+----------------------+  HTTP   +----------------------+  HTTP   +----------------------------+
-|   agent-service      |<------->| agent-tools-service  |         |   agent-knowledge          |
-|     (Port 8080)      |         |    (Port 8081)       |         |     (Port 8083)            |
-+----------+-----------+         +----------------------+         +----------------------------+
-           |                                                                  |
-           |         RabbitMQ (Telemetry Events)                              |
-           +------------------------+------------------------------------------+
-                                    v
-                     +-------------------------------+
-                     |  agent-telemetry-service       |
-                     |       (Port 8082)              |
-                     +-------------------------------+
-                                    |
-           +------------------------+------------------------+
-           v                        v                        v
-   +---------------+     +----------------+       +----------------+
-   |  PostgreSQL   |     | Elasticsearch  |       |  Prometheus    |
-   |  (pgvector)   |     |                |       |  + Grafana     |
-   +---------------+     +----------------+       +----------------+
+```mermaid
+graph TD
+    subgraph Frontend
+        UI[agent-knowledge-ui<br/>React Frontend]
+    end
+
+    subgraph Application Services
+        AS[agent-service<br/>:8080]
+        ATS[agent-tools-service<br/>:8081]
+        AK[agent-knowledge<br/>:8083]
+        ATEL[agent-telemetry-service<br/>:8082]
+    end
+
+    subgraph Infrastructure
+        PG[(PostgreSQL<br/>pgvector :5432)]
+        RD[(Redis<br/>:6379)]
+        RMQ[RabbitMQ<br/>:5672 / :15672]
+        ES[(Elasticsearch<br/>:9200)]
+        S3[S3 / Tigris<br/>Object Storage]
+    end
+
+    subgraph Monitoring
+        PROM[Prometheus<br/>:9090]
+        GRAF[Grafana<br/>:3000]
+        KIB[Kibana<br/>:5601]
+    end
+
+    UI -- HTTP --> AK
+    AS -- "HTTP · TOOLS_SERVICE_URL" --> ATS
+    ATS -- "HTTP · AGENT_SERVICE_URL" --> AS
+    AS -- "AMQP · telemetry events" --> RMQ
+    AK -- "AMQP · telemetry events" --> RMQ
+    RMQ -- consume --> ATEL
+
+    AS --> PG
+    ATS --> PG
+    AK --> PG
+    ATEL --> PG
+
+    AS --> RD
+    AK --> RD
+
+    AK --> S3
+
+    ATEL --> ES
+    ES --> KIB
+
+    AS -. /actuator/prometheus .-> PROM
+    ATS -. /actuator/prometheus .-> PROM
+    AK -. /actuator/prometheus .-> PROM
+    ATEL -. /actuator/prometheus .-> PROM
+    PROM --> GRAF
 ```
 
 ---
