@@ -117,6 +117,7 @@ const storageEnv = [
 export default function PortfolioPage() {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+  const [expandedSystems, setExpandedSystems] = useState([]);
 
   function toggleSystem(id) {
     setExpandedSystems(prev =>
@@ -143,44 +144,52 @@ export default function PortfolioPage() {
       <nav className="topbar">
         <h1 className="topbar-title">Agent Knowledge</h1>
         <div className="topbar-right">
-          <span className="user-label">
-            {user?.displayName || user?.email || 'User'}
-          </span>
-          {user?.photoURL ? (
-            <img
-              src={getAvatarUrl(user.photoURL)}
-              alt="avatar"
-              className="user-avatar"
-              onError={e => {
-                e.target.onerror = null;
-                e.target.style.display = 'none';
-                e.target.nextSibling.style.display = 'flex';
-              }}
-            />
-          ) : null}
-          <span
-            className="user-avatar-fallback"
-            style={{
-              display: user?.photoURL ? 'none' : 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              background: '#dee2e6',
-              color: '#495057',
-              fontWeight: 600,
-              fontSize: 14,
-            }}
-          >
-            {getInitials(user?.displayName, user?.email)}
-          </span>
-          <Link to="/" className="btn-nav" title="Home">
-            🏠 Home
-          </Link>
-          <button className="btn-logout" onClick={logout}>
-            Sign Out
-          </button>
+          {user ? (
+            <>
+              <span className="user-label">
+                {user.displayName || user.email || 'User'}
+              </span>
+              {user.photoURL ? (
+                <img
+                  src={getAvatarUrl(user.photoURL)}
+                  alt="avatar"
+                  className="user-avatar"
+                  onError={e => {
+                    e.target.onerror = null;
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <span
+                className="user-avatar-fallback"
+                style={{
+                  display: user.photoURL ? 'none' : 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: '#dee2e6',
+                  color: '#495057',
+                  fontWeight: 600,
+                  fontSize: 14,
+                }}
+              >
+                {getInitials(user.displayName, user.email)}
+              </span>
+              <Link to="/" className="btn-nav" title="Home">
+                🏠 Home
+              </Link>
+              <button className="btn-logout" onClick={logout}>
+                Sign Out
+              </button>
+            </>
+          ) : (
+            <Link to="/login" className="btn-nav" title="Login">
+              🔐 Login
+            </Link>
+          )}
         </div>
       </nav>
 
