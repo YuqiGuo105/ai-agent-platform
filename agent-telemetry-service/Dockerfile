@@ -53,7 +53,7 @@ ENV JAVA_OPTS="-Xms256m -Xmx512m" \
     SPRING_PROFILES_ACTIVE="docker"
 
 # Expose port
-EXPOSE 8080
+EXPOSE 8082
 
 # Run the application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar app.jar"]
