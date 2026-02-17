@@ -87,6 +87,7 @@ public class TraceQueryController {
                 run.getStatus(),
                 run.getTotalLatencyMs(),
                 run.getKbHitCount(),
+                run.getQuestion(),
                 toolDtos
         );
 

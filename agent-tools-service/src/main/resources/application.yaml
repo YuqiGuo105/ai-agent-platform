@@ -51,10 +51,11 @@ alibaba:
 # Agent service URL for KB retrieval
 agent:
   service:
-    base-url: ${AGENT_SERVICE_URL:http://localhost:8080}
+    # Default to service DNS in containerized env; override with AGENT_SERVICE_URL for prod.
+    base-url: ${AGENT_SERVICE_URL:http://agent-service:8080}
 
 server:
-  port: 8081
+  port: ${PORT:8081}
 
 # === Swagger UI / OpenAPI Documentation ===
 springdoc:

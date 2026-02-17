@@ -15,5 +15,6 @@ public record RunDetailDto(
     String status,
     Long totalLatencyMs,
     Integer kbHitCount,
+    String question,
     List<ToolCallDto> tools
 ) {}

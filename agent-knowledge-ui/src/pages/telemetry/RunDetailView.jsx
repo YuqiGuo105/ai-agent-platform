@@ -186,7 +186,7 @@ function RunDetailView() {
           <span className="card-title">❓ Query</span>
         </div>
         <div className="expanded-content">
-          {run.query || 'No query recorded'}
+          {run.question || 'No query recorded'}
         </div>
       </div>
 
@@ -205,16 +205,16 @@ function RunDetailView() {
       {/* Tool Calls Timeline */}
       <div className="card">
         <div className="card-header">
-          <span className="card-title">🔧 Tool Calls ({run.toolCalls?.length || 0})</span>
+          <span className="card-title">🔧 Tool Calls ({run.tools?.length || 0})</span>
         </div>
         
-        {!run.toolCalls || run.toolCalls.length === 0 ? (
+        {!run.tools || run.tools.length === 0 ? (
           <div className="empty-state">
             <p>No tool calls recorded for this run</p>
           </div>
         ) : (
           <div className="timeline">
-            {run.toolCalls.map((tool, index) => (
+            {run.tools.map((tool, index) => (
               <div
                 key={tool.toolCallId || index}
                 className={`timeline-item ${tool.ok === false ? 'error' : 'success'}`}
