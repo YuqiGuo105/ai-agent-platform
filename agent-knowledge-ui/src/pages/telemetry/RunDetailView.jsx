@@ -185,7 +185,7 @@ function RunDetailView() {
         <div className="card-header">
           <span className="card-title">❓ Query</span>
         </div>
-        <div className="expanded-content">
+        <div className="expanded-content query-result-text">
           {run.question || 'No query recorded'}
         </div>
       </div>

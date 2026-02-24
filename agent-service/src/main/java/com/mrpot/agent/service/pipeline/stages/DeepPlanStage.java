@@ -151,26 +151,81 @@ public class DeepPlanStage implements Processor<Void, SseEnvelope> {
     
     /**
      * Create the done envelope for deep plan stage.
-     * This envelope is sent to the frontend with complete plan structure:
-     * - stage: "deep_plan_done" for frontend routing
-     * - subtasks array: for rendering as collapsible todo list
-     * - constraints array: for displaying planning constraints
-     * - successCriteria array: for displaying completion criteria
-     * - displayType: "todoList" to signal frontend UI component to use
+     * Provides user-friendly display with structured planning data:
+     * - Metadata for UI routing (displayName, uiComponent, emoji)
+     * - Organized planning info with objective preview
+     * - Enriched subtasks, constraints, and success criteria with IDs and metadata
+     * - Summary statistics for quick reference
      */
     private SseEnvelope createDoneEnvelope(PipelineContext context, DeepPlan plan, String status) {
+        var metadata = StageNames.getMetadata(StageNames.DEEP_PLAN_DONE);
+        
+        // Build enriched subtasks with IDs and ordering
+        List<Map<String, Object>> subtasksList = new ArrayList<>();
+        List<String> subtasks = plan.subtasks();
+        for (int i = 0; i < subtasks.size(); i++) {
+            subtasksList.add(Map.of(
+                "id", "task-" + (i + 1),
+                "title", subtasks.get(i),
+                "completed", false,
+                "order", i + 1
+            ));
+        }
+        
+        // Build enriched constraints with IDs and severity
+        List<Map<String, Object>> constraintsList = new ArrayList<>();
+        List<String> constraints = plan.constraints();
+        for (int i = 0; i < constraints.size(); i++) {
+            constraintsList.add(Map.of(
+                "id", "constraint-" + (i + 1),
+                "text", constraints.get(i),
+                "severity", "high"
+            ));
+        }
+        
+        // Build enriched success criteria with IDs and status
+        List<Map<String, Object>> criteriaList = new ArrayList<>();
+        List<String> criteria = plan.successCriteria();
+        for (int i = 0; i < criteria.size(); i++) {
+            criteriaList.add(Map.of(
+                "id", "criteria-" + (i + 1),
+                "text", criteria.get(i),
+                "met", false
+            ));
+        }
+        
         return new SseEnvelope(
             StageNames.DEEP_PLAN_DONE,
-            "Plan ready (" + plan.subtasks().size() + " subtasks)",
+            String.format("%s %s", metadata.emoji(), metadata.displayName()),
             Map.ofEntries(
-                Map.entry("status", status),
-                Map.entry("objective", truncate(plan.objective(), 100)),
-                Map.entry("subtaskCount", plan.subtasks().size()),
-                Map.entry("constraintCount", plan.constraints().size()),
-                Map.entry("subtasks", plan.subtasks()),
-                Map.entry("constraints", plan.constraints()),
-                Map.entry("successCriteria", plan.successCriteria()),
-                Map.entry("displayType", "todoList")
+                // UI Metadata for frontend routing
+                Map.entry("uiComponent", metadata.uiComponent()),
+                Map.entry("displayName", metadata.displayName()),
+                Map.entry("description", metadata.description()),
+                
+                // Core planning data
+                Map.entry("planning", Map.of(
+                    "status", status,
+                    "objective", plan.objective(),
+                    "objectivePreview", truncate(plan.objective(), 100)
+                )),
+                
+                // Enriched subtasks
+                Map.entry("subtasks", subtasksList),
+                
+                // Enriched constraints
+                Map.entry("constraints", constraintsList),
+                
+                // Enriched success criteria
+                Map.entry("successCriteria", criteriaList),
+                
+                // Summary statistics
+                Map.entry("summary", Map.of(
+                    "totalSubtasks", subtasks.size(),
+                    "totalConstraints", constraints.size(),
+                    "estimatedDuration", "5-10 minutes",
+                    "complexity", "medium"
+                ))
             ),
             context.nextSeq(),
             System.currentTimeMillis(),
@@ -184,17 +239,38 @@ public class DeepPlanStage implements Processor<Void, SseEnvelope> {
         DeepArtifactStore store = new DeepArtifactStore(context);
         store.setPlan(fallback);
         
+        var metadata = StageNames.getMetadata(StageNames.DEEP_PLAN_DONE);
+        
+        // Build enriched subtasks
+        List<Map<String, Object>> subtasksList = new ArrayList<>();
+        List<String> subtasks = fallback.subtasks();
+        for (int i = 0; i < subtasks.size(); i++) {
+            subtasksList.add(Map.of(
+                "id", "task-" + (i + 1),
+                "title", subtasks.get(i),
+                "completed", false,
+                "order", i + 1
+            ));
+        }
+        
         return Mono.just(new SseEnvelope(
             StageNames.DEEP_PLAN_DONE,
-            "Plan fallback (" + reason + ")",
-            Map.of(
-                "status", "fallback",
-                "reason", reason,
-                "subtaskCount", fallback.subtasks().size(),
-                "subtasks", fallback.subtasks(),
-                "constraints", fallback.constraints(),
-                "successCriteria", fallback.successCriteria(),
-                "displayType", "todoList"
+            String.format("%s %s (fallback: %s)", metadata.emoji(), metadata.displayName(), reason),
+            Map.ofEntries(
+                Map.entry("uiComponent", metadata.uiComponent()),
+                Map.entry("displayName", metadata.displayName()),
+                Map.entry("description", metadata.description()),
+                Map.entry("planning", Map.of(
+                    "status", "fallback",
+                    "reason", reason
+                )),
+                Map.entry("subtasks", subtasksList),
+                Map.entry("constraints", fallback.constraints()),
+                Map.entry("successCriteria", fallback.successCriteria()),
+                Map.entry("summary", Map.of(
+                    "totalSubtasks", fallback.subtasks().size(),
+                    "totalConstraints", fallback.constraints().size()
+                ))
             ),
             context.nextSeq(),
             System.currentTimeMillis(),

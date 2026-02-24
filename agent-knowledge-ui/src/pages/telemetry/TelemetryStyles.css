@@ -460,6 +460,10 @@
   word-break: break-word;
 }
 
+.query-result-text {
+  color: #ffffff;
+}
+
 /* Error Box */
 .error-box {
   background: rgba(239, 68, 68, 0.1);

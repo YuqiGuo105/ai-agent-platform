@@ -1,5 +1,7 @@
 package com.mrpot.agent.common.sse;
 
+import java.util.Map;
+
 public final class StageNames {
   private StageNames() {}
 
@@ -24,7 +26,7 @@ public final class StageNames {
   public static final String FILE_EXTRACT_START = "file_extract_start";
   public static final String FILE_EXTRACT = "file_extract";
   public static final String FILE_EXTRACT_DONE = "file_extract_done";
-  public static final String RAG = "Searching";
+  public static final String RAG = "rag";
   public static final String TOOL_CALL = "tool_call";
   public static final String TOOL_CALL_START = "tool_call_start";
   public static final String TOOL_CALL_RESULT = "tool_call_result";
@@ -40,4 +42,65 @@ public final class StageNames {
   // Deep verification and reflection stages (Sprint 4)
   public static final String DEEP_VERIFICATION = "deep_verification";
   public static final String DEEP_REFLECTION = "deep_reflection";
+
+  /**
+   * Display metadata for each stage - enables user-friendly rendering and UI routing.
+   * Maps stage IDs to display info (name, description, UI component, emoji).
+   */
+  public static final Map<String, StageDisplayMetadata> STAGE_DISPLAY = Map.ofEntries(
+      Map.entry(DEEP_PLAN_DONE, new StageDisplayMetadata(
+          "Plan Generated",
+          "Planning step complete",
+          "todoList",
+          "🗂️"
+      )),
+      Map.entry(RAG, new StageDisplayMetadata(
+          "Searching Knowledge Base",
+          "Retrieving relevant documents",
+          "searchResults",
+          "🔍"
+      )),
+      Map.entry(DEEP_REASONING_STEP, new StageDisplayMetadata(
+          "Deep Reasoning",
+          "Analyzing reasoning step",
+          "reasoningStep",
+          "🧠"
+      )),
+      Map.entry(DEEP_VERIFICATION, new StageDisplayMetadata(
+          "Verifying Answer",
+          "Checking answer accuracy",
+          "verification",
+          "✓"
+      )),
+      Map.entry(ANSWER_DELTA, new StageDisplayMetadata(
+          "Getting Answer",
+          "Generating response",
+          "streaming",
+          "✍️"
+      ))
+  );
+
+  /**
+   * Display metadata for a stage: user-friendly name, description, UI component type, and emoji.
+   */
+  public record StageDisplayMetadata(
+      String displayName,
+      String description,
+      String uiComponent,
+      String emoji
+  ) {}
+
+  /**
+   * Get metadata for a stage, with fallback for unknown stages.
+   */
+  public static StageDisplayMetadata getMetadata(String stageName) {
+      return STAGE_DISPLAY.getOrDefault(stageName,
+          new StageDisplayMetadata(
+              "Processing",
+              "Stage in progress",
+              "generic",
+              "⚙️"
+          )
+      );
+  }
 }

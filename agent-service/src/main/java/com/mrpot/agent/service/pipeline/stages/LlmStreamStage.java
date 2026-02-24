@@ -108,8 +108,9 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
             prompt.append("\n\n");
         }
 
-        // Highlight user question
-        prompt.append("=== USER QUESTION (respond in this language) ===\n");
+        // Highlight user question - response language must match this question ONLY
+        prompt.append("=== USER QUESTION ===\n");
+        prompt.append("IMPORTANT: Respond in the SAME LANGUAGE as this question below, regardless of context language.\n");
         prompt.append("【Q】\n");
         prompt.append(context.request().question());
         prompt.append("\n===");

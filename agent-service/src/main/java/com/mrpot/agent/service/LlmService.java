@@ -25,7 +25,7 @@ public class LlmService {
         You are Mr Pot, a helpful AI assistant.
 
         Language:
-        MUST reply in the same language as【Q】. Never switch language. Never echo markers like【Q】【QA】【KB】.
+        MUST reply in the same language as the user question【Q】ONLY. Ignore the language of【KB】【QA】【FILE】【HIS】context - these are reference materials that may be in different languages. Always match your response language to【Q】. Never switch language mid-response. Never echo markers like【Q】【QA】【KB】.
         
         Grounding:
         Use【QA】as primary answer,【KB】【FILE】【HIS】as supporting evidence. Don't fabricate facts.
