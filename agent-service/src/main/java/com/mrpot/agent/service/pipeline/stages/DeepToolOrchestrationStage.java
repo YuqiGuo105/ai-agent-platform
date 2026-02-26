@@ -214,6 +214,9 @@ public class DeepToolOrchestrationStage implements Processor<Void, SseEnvelope> 
             return toolInvoker.call(request, context.runId())
                 .map(response -> normalizeResponse(intent, response, startTime))
                 .doOnNext(result -> {
+                    // Increment tool call count in context
+                    context.incrementToolCallCount();
+                    
                     // Track in audit service
                     ToolCallRecord record = result.success()
                         ? ToolCallRecord.success(intent.toolName(), intent.args(), result.data(), result.latencyMs())
@@ -224,12 +227,16 @@ public class DeepToolOrchestrationStage implements Processor<Void, SseEnvelope> 
                     // Add to tool call history
                     addToToolCallHistory(context, record);
                     
-                    // Add to evidence if successful
+                    // Add to evidence if successful and increment success count
                     if (result.success()) {
+                        context.incrementToolSuccessCount();
                         addToEvidence(context, intent.toolName(), result.data());
                     }
                 })
                 .onErrorResume(e -> {
+                    // Increment tool call count even for errors
+                    context.incrementToolCallCount();
+                    
                     long latency = System.currentTimeMillis() - startTime;
                     NormalizedToolResult errorResult = new NormalizedToolResult(
                         intent.toolName(),

@@ -45,28 +45,24 @@ public class ToolInvoker {
    * Execute a tool call with telemetry and run context.
    *
    * @param request the tool call request
-   * @param runId the run ID for tracing (optional)
+   * @param runId the run ID for tracing (optional, but telemetry is always emitted)
    * @return the tool call response
    */
   public Mono<CallToolResponse> call(CallToolRequest request, String runId) {
-    if (runId != null) {
-      return telemetryWrapper.wrapCall(request, runId, this::doCall);
-    }
-    return doCall(request);
+    // Always wrap with telemetry - runId may be null but events are still valuable
+    return telemetryWrapper.wrapCall(request, runId, this::doCall);
   }
 
   /**
    * Execute a tool call with full run context.
    *
    * @param request the tool call request
-   * @param runContext the run context for tracing
+   * @param runContext the run context for tracing (optional, but telemetry is always emitted)
    * @return the tool call response
    */
   public Mono<CallToolResponse> call(CallToolRequest request, RunContext runContext) {
-    if (runContext != null) {
-      return telemetryWrapper.wrapCall(request, runContext, this::doCall);
-    }
-    return doCall(request);
+    // Always wrap with telemetry - runContext may be null but events are still valuable
+    return telemetryWrapper.wrapCall(request, runContext, this::doCall);
   }
 
   /**

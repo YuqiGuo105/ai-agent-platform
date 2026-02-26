@@ -44,7 +44,7 @@ public class ToolCallTelemetryWrapper {
      * Wrap a tool call with telemetry.
      * 
      * @param request the tool call request
-     * @param runContext the run context for tracing
+     * @param runContext the run context for tracing (may be null)
      * @param toolCallFn the actual tool call function
      * @return the tool call response with telemetry emitted
      */
@@ -52,6 +52,15 @@ public class ToolCallTelemetryWrapper {
             CallToolRequest request,
             RunContext runContext,
             Function<CallToolRequest, Mono<CallToolResponse>> toolCallFn) {
+        
+        // If no context provided, create a minimal one from request fields
+        RunContext ctx = runContext != null ? runContext : RunContext.of(
+            null,
+            request.traceId(),
+            request.sessionId(),
+            null,
+            request.scopeMode()
+        );
         
         String toolCallId = UUID.randomUUID().toString();
         long startTime = System.currentTimeMillis();
@@ -65,7 +74,7 @@ public class ToolCallTelemetryWrapper {
             request.toolName(), request.args());
         
         // Emit tool.start event
-        emitStartEvent(toolCallId, runContext, request.toolName(), attempt,
+        emitStartEvent(toolCallId, ctx, request.toolName(), attempt,
             argsDigest, argsPreview, argsSize, argsKeyInfo);
         
         return toolCallFn.apply(request)
@@ -73,11 +82,11 @@ public class ToolCallTelemetryWrapper {
                 long duration = System.currentTimeMillis() - startTime;
                 if (response.ok()) {
                     // Emit tool.end event
-                    emitEndEvent(toolCallId, runContext, request.toolName(), attempt,
+                    emitEndEvent(toolCallId, ctx, request.toolName(), attempt,
                         response, duration, argsKeyInfo);
                 } else {
                     // Emit tool.error event for logical errors
-                    emitErrorEvent(toolCallId, runContext, request.toolName(), attempt,
+                    emitErrorEvent(toolCallId, ctx, request.toolName(), attempt,
                         response.error() != null ? response.error().code() : "UNKNOWN",
                         response.error() != null ? response.error().message() : "Unknown error",
                         response.error() != null && response.error().retryable(),
@@ -87,7 +96,7 @@ public class ToolCallTelemetryWrapper {
             .doOnError(error -> {
                 long duration = System.currentTimeMillis() - startTime;
                 // Emit tool.error event for exceptions
-                emitErrorEvent(toolCallId, runContext, request.toolName(), attempt,
+                emitErrorEvent(toolCallId, ctx, request.toolName(), attempt,
                     "EXCEPTION",
                     error.getMessage(),
                     isRetryable(error),
