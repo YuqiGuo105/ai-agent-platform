@@ -292,6 +292,26 @@ function RunLogsDashboard() {
                                     <span className="detail-value">{run.errorCode || '-'}</span>
                                   </div>
                                 </div>
+                                {/* Debug Context */}
+                                {(run.kbDocIds || run.kbLatencyMs) && (
+                                  <div className="detail-section">
+                                    <h4>Debug Context</h4>
+                                    {run.kbLatencyMs && (
+                                      <div className="detail-item">
+                                        <span className="detail-label">KB Latency:</span>
+                                        <span className="detail-value">{run.kbLatencyMs}ms</span>
+                                      </div>
+                                    )}
+                                    {run.kbDocIds && (
+                                      <div className="detail-item">
+                                        <span className="detail-label">KB Doc IDs:</span>
+                                        <code className="detail-value" style={{ fontSize: '0.75rem', wordBreak: 'break-all' }}>
+                                          {run.kbDocIds}
+                                        </code>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                               {run.question && (
                                 <div className="detail-section full-width">
@@ -303,6 +323,35 @@ function RunLogsDashboard() {
                                 <div className="detail-section full-width">
                                   <h4>Answer</h4>
                                   <div className="detail-content answer-content">{run.answerFinal}</div>
+                                </div>
+                              )}
+                              {run.historyCount > 0 && (
+                                <div className="detail-section full-width">
+                                  <h4>Conversation History ({run.historyCount} messages)</h4>
+                                  {run.recentQuestionsJson && (() => {
+                                    try {
+                                      const questions = JSON.parse(run.recentQuestionsJson);
+                                      return (
+                                        <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '0.85rem', color: '#374151' }}>
+                                          {questions.map((q, i) => (
+                                            <li key={i} style={{ marginBottom: '4px' }}>{q}</li>
+                                          ))}
+                                        </ul>
+                                      );
+                                    } catch { return null; }
+                                  })()}
+                                </div>
+                              )}
+                              {run.kbDocIds && (
+                                <div className="detail-section full-width">
+                                  <h4>KB Context (CTX) — {run.kbHitCount ?? 0} hits</h4>
+                                  <div className="detail-content" style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                                    {run.kbDocIds.split(',').map((id, i) => (
+                                      <span key={i} style={{ display: 'inline-block', background: '#f3f4f6', borderRadius: '4px', padding: '2px 6px', margin: '2px' }}>
+                                        {id.trim()}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                               <div className="detail-actions">

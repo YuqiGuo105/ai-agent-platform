@@ -68,6 +68,7 @@ public class TelemetryProjector {
         // Process based on event type
         switch (envelope.type()) {
             case "run.start" -> processRunStart(envelope);
+            case "run.history_done" -> processHistoryDone(envelope);
             case "run.rag_done" -> processRagDone(envelope);
             case "run.final" -> processRunFinal(envelope);
             case "run.failed" -> processRunFailed(envelope);
@@ -180,6 +181,26 @@ public class TelemetryProjector {
         });
     }
 
+    private void processHistoryDone(RunLogEnvelope e) {
+        runRepo.findById(e.runId()).ifPresent(run -> {
+            run.setUpdatedAt(Instant.now());
+            Object hc = e.data().get("historyCount");
+            if (hc instanceof Integer count) {
+                run.setHistoryCount(count);
+            }
+            Object rq = e.data().get("recentQuestions");
+            if (rq instanceof List<?> list) {
+                try {
+                    run.setRecentQuestionsJson(objectMapper.writeValueAsString(list));
+                } catch (JsonProcessingException ex) {
+                    log.warn("Failed to serialize recentQuestions: {}", ex.getMessage());
+                }
+            }
+            runRepo.save(run);
+            addToOutbox(ES_INDEX_RUNS, e.runId(), run);
+        });
+    }
+
     private void processRunFinal(RunLogEnvelope e) {
         runRepo.findById(e.runId()).ifPresent(run -> {
             if (canUpdateStatus(run.getStatus(), "DONE")) {
@@ -187,6 +208,14 @@ public class TelemetryProjector {
                 run.setAnswerFinal(trunc((String) e.data().getOrDefault("answerFinal", ""), 11000));
                 run.setTotalLatencyMs(toLong(e.data().get("totalLatencyMs"), 0L));
                 run.setStatus("DONE");
+
+                // Set execution metrics
+                run.setComplexityScore(toDouble(e.data().get("complexityScore"), null));
+                run.setExecutionMode((String) e.data().get("executionMode"));
+                run.setDeepRoundsUsed(toInt(e.data().get("deepRoundsUsed"), null));
+                run.setToolCallsCount(toInt(e.data().get("toolCallsCount"), null));
+                run.setToolSuccessRate(toDouble(e.data().get("toolSuccessRate"), null));
+                run.setFeatureBreakdownJson((String) e.data().get("featureBreakdownJson"));
 
                 Object parentRunId = e.data().get("parentRunId");
                 if (parentRunId instanceof String pid && !pid.isBlank() && run.getParentRunId() == null) {
@@ -334,7 +363,7 @@ public class TelemetryProjector {
         return s.length() <= n ? s : s.substring(0, n) + " ...[truncated]";
     }
 
-    private static int toInt(Object v, int def) {
+    private static Integer toInt(Object v, Integer def) {
         if (v == null) return def;
         if (v instanceof Number n) return n.intValue();
         try { return Integer.parseInt(String.valueOf(v)); } 
@@ -345,6 +374,13 @@ public class TelemetryProjector {
         if (v == null) return def;
         if (v instanceof Number n) return n.longValue();
         try { return Long.parseLong(String.valueOf(v)); } 
+        catch (Exception ignored) { return def; }
+    }
+
+    private static Double toDouble(Object v, Double def) {
+        if (v == null) return def;
+        if (v instanceof Number n) return n.doubleValue();
+        try { return Double.parseDouble(String.valueOf(v)); }
         catch (Exception ignored) { return def; }
     }
 }

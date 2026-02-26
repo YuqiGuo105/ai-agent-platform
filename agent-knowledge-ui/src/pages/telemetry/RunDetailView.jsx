@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getRunDetail } from '../../services/telemetryApi';
+import { getRunDetail, getRunToolCalls } from '../../services/telemetryApi';
 import { formatDateTime, formatDuration, formatJson, getFreshnessClass } from '../../utils/formatters';
 import './TelemetryStyles.css';
 
@@ -17,6 +17,7 @@ function RunDetailView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedTools, setExpandedTools] = useState({});
+  const [fetchedTools, setFetchedTools] = useState([]);  // NEW: for fallback fetch
 
   useEffect(() => {
     const fetchRunDetail = async () => {
@@ -25,6 +26,16 @@ function RunDetailView() {
       try {
         const data = await getRunDetail(runId);
         setRun(data);
+        // Fallback: if run detail has no tools, fetch separately
+        if (!data.tools || data.tools.length === 0) {
+          try {
+            const tools = await getRunToolCalls(runId);
+            setFetchedTools(tools || []);
+          } catch (toolErr) {
+            // Non-fatal: tool fetch failure doesn't break the page
+            console.warn('Failed to fetch tool calls separately:', toolErr);
+          }
+        }
       } catch (err) {
         setError(err.message || 'Failed to fetch run details');
       } finally {
@@ -168,6 +179,12 @@ function RunDetailView() {
               <span className="metadata-value">{(run.toolSuccessRate * 100).toFixed(1)}%</span>
             </div>
           )}
+          {run.kbHitCount !== null && run.kbHitCount !== undefined && (
+            <div className="metadata-item">
+              <span className="metadata-label">KB Hits</span>
+              <span className="metadata-value">{run.kbHitCount}</span>
+            </div>
+          )}
         </div>
         
         {run.featureBreakdownJson && (
@@ -179,6 +196,43 @@ function RunDetailView() {
           </div>
         )}
       </div>
+
+      {/* Conversation History */}
+      {(run.historyCount > 0 || run.recentQuestionsJson) && (
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">📜 Conversation History ({run.historyCount ?? 0} messages)</span>
+          </div>
+          <div className="expanded-content">
+            {run.recentQuestionsJson && (() => {
+              try {
+                const questions = JSON.parse(run.recentQuestionsJson);
+                return (
+                  <ol style={{ margin: 0, paddingLeft: '20px' }}>
+                    {questions.map((q, i) => <li key={i} style={{ marginBottom: '6px' }}>{q}</li>)}
+                  </ol>
+                );
+              } catch { return <span>Unable to parse history</span>; }
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* KB Context */}
+      {run.kbDocIds && (
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">📂 KB Context (CTX) — {run.kbHitCount ?? 0} hits{run.kbLatencyMs ? ` · ${run.kbLatencyMs}ms` : ''}</span>
+          </div>
+          <div className="expanded-content">
+            {run.kbDocIds.split(',').map((id, i) => (
+              <span key={i} style={{ display: 'inline-block', background: '#f3f4f6', borderRadius: '4px', padding: '2px 8px', margin: '2px', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                {id.trim()}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Query */}
       <div className="card">
@@ -203,18 +257,21 @@ function RunDetailView() {
       )}
 
       {/* Tool Calls Timeline */}
-      <div className="card">
-        <div className="card-header">
-          <span className="card-title">🔧 Tool Calls ({run.tools?.length || 0})</span>
-        </div>
-        
-        {!run.tools || run.tools.length === 0 ? (
-          <div className="empty-state">
-            <p>No tool calls recorded for this run</p>
-          </div>
-        ) : (
-          <div className="timeline">
-            {run.tools.map((tool, index) => (
+      {(() => {
+        const displayTools = (run.tools && run.tools.length > 0) ? run.tools : fetchedTools;
+        return (
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">🔧 Tool Calls ({displayTools.length})</span>
+            </div>
+            
+            {displayTools.length === 0 ? (
+              <div className="empty-state">
+                <p>No tool calls recorded for this run</p>
+              </div>
+            ) : (
+              <div className="timeline">
+                {displayTools.map((tool, index) => (
               <div
                 key={tool.toolCallId || index}
                 className={`timeline-item ${tool.ok === false ? 'error' : 'success'}`}
@@ -230,6 +287,8 @@ function RunDetailView() {
                     <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '4px' }}>
                       {formatDateTime(tool.sourceTs)}
                       {tool.durationMs && ` • ${tool.durationMs}ms`}
+                      {tool.attempt > 1 && ` • attempt #${tool.attempt}`}
+                      {tool.cacheHit !== null && tool.cacheHit !== undefined && ` • ${tool.cacheHit ? '⚡ cache hit' : '🔄 cache miss'}`}
                     </div>
                   </div>
                   <button
@@ -251,10 +310,18 @@ function RunDetailView() {
                       </div>
                     )}
                     {tool.resultPreview && (
-                      <div>
+                      <div style={{ marginBottom: '12px' }}>
                         <strong style={{ fontSize: '0.85rem', color: '#6b7280' }}>Output:</strong>
                         <div className="expanded-content">
                           {formatJson(tool.resultPreview)}
+                        </div>
+                      </div>
+                    )}
+                    {tool.keyInfoJson && (
+                      <div style={{ marginBottom: '12px' }}>
+                        <strong style={{ fontSize: '0.85rem', color: '#6b7280' }}>📋 Key Info:</strong>
+                        <div className="expanded-content" style={{ marginTop: '4px' }}>
+                          {formatJson(tool.keyInfoJson)}
                         </div>
                       </div>
                     )}
@@ -272,7 +339,9 @@ function RunDetailView() {
             ))}
           </div>
         )}
-      </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

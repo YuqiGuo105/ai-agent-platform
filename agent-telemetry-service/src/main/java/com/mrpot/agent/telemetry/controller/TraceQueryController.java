@@ -87,7 +87,18 @@ public class TraceQueryController {
                 run.getStatus(),
                 run.getTotalLatencyMs(),
                 run.getKbHitCount(),
+                run.getKbDocIds(),              // KB document IDs
+                run.getKbLatencyMs(),           // KB latency
+                run.getHistoryCount(),          // History count
+                run.getRecentQuestionsJson(),   // Recent questions JSON
                 run.getQuestion(),
+                run.getAnswerFinal(),           // Final answer
+                run.getComplexityScore(),       // Complexity score
+                run.getExecutionMode(),         // Execution mode
+                run.getDeepRoundsUsed(),        // Deep rounds used
+                run.getToolCallsCount(),        // Tool calls count
+                run.getToolSuccessRate(),       // Tool success rate
+                run.getFeatureBreakdownJson(),  // Feature breakdown JSON
                 toolDtos
         );
 
@@ -193,7 +204,8 @@ public class TraceQueryController {
                 tc.getErrorCode(),
                 tc.getErrorMsg(),
                 tc.getRetryable(),
-                tc.getCalledAt()  // Use calledAt as sourceTs
+                tc.getCalledAt(),  // Use calledAt as sourceTs
+                tc.getKeyInfoJson()    // Key info JSON
         );
     }
 }

@@ -33,6 +33,11 @@ public class KnowledgeRunEntity {
     @Column(length=2000)
     private String kbDocIds;
 
+    private Integer historyCount;
+
+    @Column(length = 4000)
+    private String recentQuestionsJson;  // JSON array of recent user question strings
+
     private Long kbLatencyMs;
     private Long totalLatencyMs;
 
@@ -44,4 +49,18 @@ public class KnowledgeRunEntity {
 
     @Column(length = 20)
     private String replayMode;
+
+    private Double complexityScore;
+
+    @Column(length = 20)
+    private String executionMode;  // "FAST" or "DEEP"
+
+    private Integer deepRoundsUsed;
+
+    private Integer toolCallsCount;
+
+    private Double toolSuccessRate;
+
+    @Column(columnDefinition = "TEXT")
+    private String featureBreakdownJson;
 }
