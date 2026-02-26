@@ -32,6 +32,9 @@ public class KnowledgeRunEntity {
 
     @Column(length=2000)
     private String kbDocIds;
+    
+    @Column(columnDefinition = "TEXT")
+    private String kbContextText;  // Full KB document content text
 
     private Integer historyCount;
 
