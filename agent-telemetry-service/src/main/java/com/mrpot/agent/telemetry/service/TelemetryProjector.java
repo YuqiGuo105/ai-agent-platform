@@ -165,96 +165,140 @@ public class TelemetryProjector {
     }
 
     private void processRagDone(RunLogEnvelope e) {
-        runRepo.findById(e.runId()).ifPresent(run -> {
-            run.setUpdatedAt(Instant.now());
-            run.setKbHitCount(toInt(e.data().get("kbHitCount"), 0));
-            run.setKbLatencyMs(toLong(e.data().get("kbLatencyMs"), 0L));
+        log.info("Processing run.rag_done for runId={}, data={}", e.runId(), e.data());
+        // Use orElseGet to create run if it doesn't exist (handles race condition with run.start)
+        KnowledgeRunEntity run = runRepo.findById(e.runId()).orElseGet(() -> {
+            log.warn("Run {} not found for rag_done, creating new record", e.runId());
+            KnowledgeRunEntity n = new KnowledgeRunEntity();
+            n.setId(e.runId());
+            n.setCreatedAt(Instant.now());
+            n.setStatus("RUNNING");
+            return n;
+        });
+        
+        run.setUpdatedAt(Instant.now());
+        run.setKbHitCount(toInt(e.data().get("kbHitCount"), 0));
+        run.setKbLatencyMs(toLong(e.data().get("kbLatencyMs"), 0L));
 
-            Object ids = e.data().get("kbDocIds");
-            if (ids instanceof List<?> list) {
-                run.setKbDocIds(String.join(",", list.stream().map(String::valueOf).toList()));
+        Object ids = e.data().get("kbDocIds");
+        if (ids instanceof List<?> list) {
+            String kbDocIds = String.join(",", list.stream().map(String::valueOf).toList());
+            log.info("Setting kbDocIds for run {}: {}", e.runId(), kbDocIds);
+            run.setKbDocIds(kbDocIds);
+        }
+        // Note: kbContextText is fetched server-side at query time from KB service
+        runRepo.save(run);
+        
+        // Update ES outbox
+        addToOutbox(ES_INDEX_RUNS, e.runId(), run);
+    }
+
+    private void processHistoryDone(RunLogEnvelope e) {
+        log.info("Processing run.history_done for runId={}, data={}", e.runId(), e.data());
+        // Use orElseGet to create run if it doesn't exist (handles race condition with run.start)
+        KnowledgeRunEntity run = runRepo.findById(e.runId()).orElseGet(() -> {
+            log.warn("Run {} not found for history_done, creating new record", e.runId());
+            KnowledgeRunEntity n = new KnowledgeRunEntity();
+            n.setId(e.runId());
+            n.setCreatedAt(Instant.now());
+            n.setStatus("RUNNING");
+            return n;
+        });
+        
+        run.setUpdatedAt(Instant.now());
+        Object hc = e.data().get("historyCount");
+        if (hc instanceof Integer count) {
+            run.setHistoryCount(count);
+        }
+        Object rq = e.data().get("recentQuestions");
+        if (rq instanceof List<?> list) {
+            try {
+                String json = objectMapper.writeValueAsString(list);
+                log.info("Setting recentQuestionsJson for run {}: {}", e.runId(), json);
+                run.setRecentQuestionsJson(json);
+            } catch (JsonProcessingException ex) {
+                log.warn("Failed to serialize recentQuestions: {}", ex.getMessage());
             }
+        }
+        runRepo.save(run);
+        addToOutbox(ES_INDEX_RUNS, e.runId(), run);
+    }
+
+    private void processRunFinal(RunLogEnvelope e) {
+        // Use orElseGet to create run if it doesn't exist (handles race condition with run.start)
+        KnowledgeRunEntity run = runRepo.findById(e.runId()).orElseGet(() -> {
+            log.warn("Run {} not found for run.final, creating new record", e.runId());
+            KnowledgeRunEntity n = new KnowledgeRunEntity();
+            n.setId(e.runId());
+            n.setCreatedAt(Instant.now());
+            return n;
+        });
+        
+        if (canUpdateStatus(run.getStatus(), "DONE")) {
+            run.setUpdatedAt(Instant.now());
+            run.setAnswerFinal(trunc((String) e.data().getOrDefault("answerFinal", ""), 11000));
+            run.setTotalLatencyMs(toLong(e.data().get("totalLatencyMs"), 0L));
+            run.setStatus("DONE");
+
+            // Set execution metrics
+            run.setComplexityScore(toDouble(e.data().get("complexityScore"), null));
+            run.setExecutionMode((String) e.data().get("executionMode"));
+            run.setDeepRoundsUsed(toInt(e.data().get("deepRoundsUsed"), null));
+            run.setToolCallsCount(toInt(e.data().get("toolCallsCount"), null));
+            run.setToolSuccessRate(toDouble(e.data().get("toolSuccessRate"), null));
+            run.setFeatureBreakdownJson((String) e.data().get("featureBreakdownJson"));
+
+            Object parentRunId = e.data().get("parentRunId");
+            if (parentRunId instanceof String pid && !pid.isBlank() && run.getParentRunId() == null) {
+                run.setParentRunId(pid);
+            }
+
             runRepo.save(run);
             
             // Update ES outbox
             addToOutbox(ES_INDEX_RUNS, e.runId(), run);
-        });
-    }
-
-    private void processHistoryDone(RunLogEnvelope e) {
-        runRepo.findById(e.runId()).ifPresent(run -> {
-            run.setUpdatedAt(Instant.now());
-            Object hc = e.data().get("historyCount");
-            if (hc instanceof Integer count) {
-                run.setHistoryCount(count);
-            }
-            Object rq = e.data().get("recentQuestions");
-            if (rq instanceof List<?> list) {
-                try {
-                    run.setRecentQuestionsJson(objectMapper.writeValueAsString(list));
-                } catch (JsonProcessingException ex) {
-                    log.warn("Failed to serialize recentQuestions: {}", ex.getMessage());
-                }
-            }
-            runRepo.save(run);
-            addToOutbox(ES_INDEX_RUNS, e.runId(), run);
-        });
-    }
-
-    private void processRunFinal(RunLogEnvelope e) {
-        runRepo.findById(e.runId()).ifPresent(run -> {
-            if (canUpdateStatus(run.getStatus(), "DONE")) {
-                run.setUpdatedAt(Instant.now());
-                run.setAnswerFinal(trunc((String) e.data().getOrDefault("answerFinal", ""), 11000));
-                run.setTotalLatencyMs(toLong(e.data().get("totalLatencyMs"), 0L));
-                run.setStatus("DONE");
-
-                // Set execution metrics
-                run.setComplexityScore(toDouble(e.data().get("complexityScore"), null));
-                run.setExecutionMode((String) e.data().get("executionMode"));
-                run.setDeepRoundsUsed(toInt(e.data().get("deepRoundsUsed"), null));
-                run.setToolCallsCount(toInt(e.data().get("toolCallsCount"), null));
-                run.setToolSuccessRate(toDouble(e.data().get("toolSuccessRate"), null));
-                run.setFeatureBreakdownJson((String) e.data().get("featureBreakdownJson"));
-
-                Object parentRunId = e.data().get("parentRunId");
-                if (parentRunId instanceof String pid && !pid.isBlank() && run.getParentRunId() == null) {
-                    run.setParentRunId(pid);
-                }
-
-                runRepo.save(run);
-                
-                // Update ES outbox
-                addToOutbox(ES_INDEX_RUNS, e.runId(), run);
-            }
-        });
+        }
     }
 
     private void processRunFailed(RunLogEnvelope e) {
-        runRepo.findById(e.runId()).ifPresent(run -> {
-            if (canUpdateStatus(run.getStatus(), "FAILED")) {
-                run.setUpdatedAt(Instant.now());
-                run.setStatus("FAILED");
-                run.setErrorCode(trunc(String.valueOf(e.data().getOrDefault("errorCode", "UNKNOWN")), 120));
-                runRepo.save(run);
-                
-                // Update ES outbox
-                addToOutbox(ES_INDEX_RUNS, e.runId(), run);
-            }
+        // Use orElseGet to create run if it doesn't exist (handles race condition with run.start)
+        KnowledgeRunEntity run = runRepo.findById(e.runId()).orElseGet(() -> {
+            log.warn("Run {} not found for run.failed, creating new record", e.runId());
+            KnowledgeRunEntity n = new KnowledgeRunEntity();
+            n.setId(e.runId());
+            n.setCreatedAt(Instant.now());
+            return n;
         });
+        
+        if (canUpdateStatus(run.getStatus(), "FAILED")) {
+            run.setUpdatedAt(Instant.now());
+            run.setStatus("FAILED");
+            run.setErrorCode(trunc(String.valueOf(e.data().getOrDefault("errorCode", "UNKNOWN")), 120));
+            runRepo.save(run);
+            
+            // Update ES outbox
+            addToOutbox(ES_INDEX_RUNS, e.runId(), run);
+        }
     }
 
     private void processRunCancelled(RunLogEnvelope e) {
-        runRepo.findById(e.runId()).ifPresent(run -> {
-            if (canUpdateStatus(run.getStatus(), "CANCELLED")) {
-                run.setUpdatedAt(Instant.now());
-                run.setStatus("CANCELLED");
-                runRepo.save(run);
-                
-                // Update ES outbox
-                addToOutbox(ES_INDEX_RUNS, e.runId(), run);
-            }
+        // Use orElseGet to create run if it doesn't exist (handles race condition with run.start)
+        KnowledgeRunEntity run = runRepo.findById(e.runId()).orElseGet(() -> {
+            log.warn("Run {} not found for run.cancelled, creating new record", e.runId());
+            KnowledgeRunEntity n = new KnowledgeRunEntity();
+            n.setId(e.runId());
+            n.setCreatedAt(Instant.now());
+            return n;
         });
+        
+        if (canUpdateStatus(run.getStatus(), "CANCELLED")) {
+            run.setUpdatedAt(Instant.now());
+            run.setStatus("CANCELLED");
+            runRepo.save(run);
+            
+            // Update ES outbox
+            addToOutbox(ES_INDEX_RUNS, e.runId(), run);
+        }
     }
 
     private void processToolEnd(ToolTelemetryEvent e) {

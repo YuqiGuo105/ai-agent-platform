@@ -187,8 +187,8 @@ class TelemetryProjectorTest {
     }
 
     @Test
-    void processHistoryDone_skipsIfRunNotFound() {
-        // Given
+    void processHistoryDone_createsRunIfNotFound() {
+        // Given: run doesn't exist yet (can happen due to race condition)
         RunLogEnvelope envelope = new RunLogEnvelope(
             "1",
             "run.history_done",
@@ -199,7 +199,7 @@ class TelemetryProjectorTest {
             "GENERAL",
             "deepseek",
             Instant.now(),
-            Map.of("historyCount", 5)
+            Map.of("historyCount", 5, "recentQuestions", List.of("Question 1"))
         );
 
         when(runRepo.findById("run-nonexistent")).thenReturn(Optional.empty());
@@ -207,10 +207,17 @@ class TelemetryProjectorTest {
         // When
         boolean processed = projector.processRunEvent(envelope);
 
-        // Then
+        // Then: should create the run with history data
         assertTrue(processed);
-        verify(runRepo, never()).save(any());
-        verify(outboxRepo, never()).save(any());
+        
+        ArgumentCaptor<KnowledgeRunEntity> runCaptor = ArgumentCaptor.forClass(KnowledgeRunEntity.class);
+        verify(runRepo).save(runCaptor.capture());
+        
+        KnowledgeRunEntity savedRun = runCaptor.getValue();
+        assertEquals("run-nonexistent", savedRun.getId());
+        assertEquals(5, savedRun.getHistoryCount());
+        assertEquals("[\"Question 1\"]", savedRun.getRecentQuestionsJson());
+        assertEquals("RUNNING", savedRun.getStatus());
     }
 
     @Test
