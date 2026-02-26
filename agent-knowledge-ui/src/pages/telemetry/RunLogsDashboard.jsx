@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { searchRuns } from '../../services/telemetryApi';
+import { searchRuns, deleteRun, deleteRunsBatch } from '../../services/telemetryApi';
 import { formatDateTime, formatDuration } from '../../utils/formatters';
 import './TelemetryStyles.css';
 
@@ -11,6 +11,7 @@ import './TelemetryStyles.css';
  * - Filter by status
  * - Paginated results with collapsible rows
  * - Click to expand and view run details
+ * - Individual and batch delete
  */
 function RunLogsDashboard() {
   const navigate = useNavigate();
@@ -24,6 +25,15 @@ function RunLogsDashboard() {
   const [totalElements, setTotalElements] = useState(0);
   const [jumpPage, setJumpPage] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
+  
+  // Selection state
+  const [selectedRuns, setSelectedRuns] = useState(new Set());
+  
+  // Delete state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null); // null = batch, string = single runId
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
   
   // Filters from URL params
   const sessionId = searchParams.get('sessionId') || '';
@@ -106,6 +116,65 @@ function RunLogsDashboard() {
     });
   };
 
+  // Selection handlers
+  const toggleSelectRun = (runId, e) => {
+    e.stopPropagation();
+    setSelectedRuns(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(runId)) {
+        newSet.delete(runId);
+      } else {
+        newSet.add(runId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = (e) => {
+    e.stopPropagation();
+    if (selectedRuns.size === runs.length) {
+      setSelectedRuns(new Set());
+    } else {
+      setSelectedRuns(new Set(runs.map(r => r.id)));
+    }
+  };
+
+  // Delete handlers
+  const handleDeleteClick = (runId, e) => {
+    if (e) e.stopPropagation();
+    setDeleteTarget(runId);
+    setDeleteError(null);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleBatchDeleteClick = () => {
+    setDeleteTarget(null); // null means batch
+    setDeleteError(null);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      if (deleteTarget) {
+        // Single delete
+        await deleteRun(deleteTarget);
+      } else {
+        // Batch delete
+        await deleteRunsBatch(Array.from(selectedRuns));
+        setSelectedRuns(new Set());
+      }
+      setShowDeleteConfirm(false);
+      setDeleteTarget(null);
+      fetchRuns(); // Refresh list
+    } catch (err) {
+      setDeleteError(err.message || 'Failed to delete');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Get status icon
   const getStatusIcon = (status) => {
     switch (status) {
@@ -124,10 +193,60 @@ function RunLogsDashboard() {
           <Link to="/" className="back-link">← Back to Knowledge Base</Link>
           <h1>📊 Run Logs Dashboard</h1>
         </div>
-        <button className="btn btn-secondary" onClick={fetchRuns}>
-          🔄 Refresh
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {selectedRuns.size > 0 && (
+            <button className="btn delete-btn" onClick={handleBatchDeleteClick}>
+              🗑️ Delete Selected ({selectedRuns.size})
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={fetchRuns}>
+            🔄 Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => !deleting && setShowDeleteConfirm(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>⚠️ {deleteTarget ? 'Delete Run Log' : `Delete ${selectedRuns.size} Run Logs`}</h3>
+            </div>
+            <div className="modal-body">
+              {deleteTarget ? (
+                <>
+                  <p>Are you sure you want to delete this run log?</p>
+                  <p><strong>Run ID:</strong> <code>{deleteTarget}</code></p>
+                </>
+              ) : (
+                <>
+                  <p>Are you sure you want to delete <strong>{selectedRuns.size}</strong> selected run logs?</p>
+                </>
+              )}
+              <p className="warning-text">This will delete the run logs and associated tool call/event records. Your KB documents will NOT be affected.</p>
+              {deleteError && (
+                <div className="error-box">{deleteError}</div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="cancel-btn" 
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button 
+                className="confirm-delete-btn" 
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : (deleteTarget ? 'Delete Run Log' : `Delete ${selectedRuns.size} Logs`)}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="card">
@@ -187,12 +306,21 @@ function RunLogsDashboard() {
               <table className="runs-table">
                 <thead>
                   <tr>
+                    <th style={{ width: '40px' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={runs.length > 0 && selectedRuns.size === runs.length}
+                        onChange={toggleSelectAll}
+                        title="Select all"
+                      />
+                    </th>
                     <th style={{ width: '40px' }}></th>
                     <th>Status</th>
                     <th>Question</th>
                     <th>Created At</th>
                     <th>Latency</th>
                     <th>Mode</th>
+                    <th style={{ width: '60px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -200,9 +328,16 @@ function RunLogsDashboard() {
                     <>
                       <tr
                         key={run.id}
-                        className={`clickable-row ${expandedRows.has(run.id) ? 'expanded' : ''}`}
+                        className={`clickable-row ${expandedRows.has(run.id) ? 'expanded' : ''} ${selectedRuns.has(run.id) ? 'selected' : ''}`}
                         onClick={() => toggleRow(run.id)}
                       >
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <input 
+                            type="checkbox" 
+                            checked={selectedRuns.has(run.id)}
+                            onChange={(e) => toggleSelectRun(run.id, e)}
+                          />
+                        </td>
                         <td className="expand-cell">
                           <span className="expand-icon">{expandedRows.has(run.id) ? '▼' : '▶'}</span>
                         </td>
@@ -227,10 +362,19 @@ function RunLogsDashboard() {
                             {run.mode || 'GENERAL'}
                           </span>
                         </td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <button 
+                            className="btn-icon delete-icon" 
+                            onClick={(e) => handleDeleteClick(run.id, e)}
+                            title="Delete this run"
+                          >
+                            🗑️
+                          </button>
+                        </td>
                       </tr>
                       {expandedRows.has(run.id) && (
                         <tr key={`${run.id}-details`} className="details-row">
-                          <td colSpan="6">
+                          <td colSpan="8">
                             <div className="run-details">
                               <div className="details-grid">
                                 <div className="detail-section">

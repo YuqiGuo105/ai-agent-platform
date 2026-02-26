@@ -57,6 +57,26 @@ export const getRunToolCalls = async (runId) => {
   return response.data;
 };
 
+/**
+ * Delete a run and all associated data (tool calls, events)
+ * @param {string} runId - Run UUID
+ * @returns {Promise<{deleted: boolean, runId: string, toolCallsDeleted: number, eventsDeleted: number}>}
+ */
+export const deleteRun = async (runId) => {
+  const response = await telemetryApi.delete(`/runs/${runId}`);
+  return response.data;
+};
+
+/**
+ * Batch delete multiple runs and all associated data
+ * @param {string[]} runIds - Array of Run UUIDs
+ * @returns {Promise<{deleted: boolean, runsDeleted: number, toolCallsDeleted: number, eventsDeleted: number}>}
+ */
+export const deleteRunsBatch = async (runIds) => {
+  const response = await telemetryApi.delete('/runs/batch', { data: runIds });
+  return response.data;
+};
+
 // ==================== DLQ API ====================
 
 /**
