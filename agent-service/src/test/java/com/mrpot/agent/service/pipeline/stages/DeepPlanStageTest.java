@@ -110,7 +110,9 @@ class DeepPlanStageTest {
                 assertThat(envelope.stage()).isEqualTo(StageNames.DEEP_PLAN_DONE);
                 @SuppressWarnings("unchecked")
                 var payload = (java.util.Map<String, Object>) envelope.payload();
-                assertThat(payload.get("status")).isEqualTo("fallback");
+                @SuppressWarnings("unchecked")
+                var planning = (java.util.Map<String, Object>) payload.get("planning");
+                assertThat(planning.get("status")).isEqualTo("fallback");
             })
             .verifyComplete();
         
@@ -136,7 +138,9 @@ class DeepPlanStageTest {
                 assertThat(envelope.stage()).isEqualTo(StageNames.DEEP_PLAN_DONE);
                 @SuppressWarnings("unchecked")
                 var payload = (java.util.Map<String, Object>) envelope.payload();
-                assertThat(payload.get("status")).isEqualTo("fallback");
+                @SuppressWarnings("unchecked")
+                var planning = (java.util.Map<String, Object>) payload.get("planning");
+                assertThat(planning.get("status")).isEqualTo("fallback");
             })
             .verifyComplete();
         

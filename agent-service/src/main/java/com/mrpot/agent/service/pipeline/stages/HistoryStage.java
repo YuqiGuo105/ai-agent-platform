@@ -2,14 +2,17 @@ package com.mrpot.agent.service.pipeline.stages;
 
 import com.mrpot.agent.common.sse.SseEnvelope;
 import com.mrpot.agent.common.sse.StageNames;
+import com.mrpot.agent.common.telemetry.RunLogEnvelope;
 import com.mrpot.agent.service.ConversationHistoryService;
 import com.mrpot.agent.model.ChatMessage;
 import com.mrpot.agent.service.pipeline.PipelineContext;
 import com.mrpot.agent.service.pipeline.Processor;
+import com.mrpot.agent.service.telemetry.RunLogPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -25,8 +28,10 @@ public class HistoryStage implements Processor<Void, SseEnvelope> {
 
     public static final String KEY_CONVERSATION_HISTORY = "conversationHistory";
     private static final int DEFAULT_HISTORY_LIMIT = 3;
+    private static final String VERSION = "1";
 
     private final ConversationHistoryService conversationHistoryService;
+    private final RunLogPublisher runLogPublisher;
 
     @Override
     public Mono<SseEnvelope> process(Void input, PipelineContext context) {
@@ -51,6 +56,9 @@ public class HistoryStage implements Processor<Void, SseEnvelope> {
 
                 log.info("Retrieved {} messages from conversation history for runId={}",
                     historyCount, context.runId());
+
+                // Publish telemetry event
+                publishHistoryDoneTelemetry(context, historyCount, recentQuestions);
 
                 // Build display message from recent questions
                 String displayMessage = recentQuestions.isEmpty()
@@ -94,5 +102,33 @@ public class HistoryStage implements Processor<Void, SseEnvelope> {
                     context.sessionId()
                 ));
             });
+    }
+
+    /**
+     * Publish history_done telemetry event.
+     */
+    private void publishHistoryDoneTelemetry(PipelineContext context, int historyCount, List<String> recentQuestions) {
+        try {
+            RunLogEnvelope envelope = new RunLogEnvelope(
+                VERSION,
+                "run.history_done",
+                context.runId(),
+                context.traceId(),
+                context.sessionId(),
+                context.userId(),
+                context.scopeMode().name(),
+                "deepseek",
+                Instant.now(),
+                Map.of(
+                    "historyCount", historyCount,
+                    "recentQuestions", recentQuestions
+                )
+            );
+            runLogPublisher.publish(envelope);
+            log.debug("Published history_done telemetry for runId={}", context.runId());
+        } catch (Exception e) {
+            log.warn("Failed to publish history telemetry for runId={}: {}",
+                context.runId(), e.getMessage());
+        }
     }
 }

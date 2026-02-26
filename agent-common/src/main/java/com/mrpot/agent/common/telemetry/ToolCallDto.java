@@ -18,5 +18,6 @@ public record ToolCallDto(
     String errorCode,
     String errorMsg,
     Boolean retryable,
-    Instant sourceTs
+    Instant sourceTs,
+    String keyInfoJson    // Extracted key info as JSON string
 ) {}

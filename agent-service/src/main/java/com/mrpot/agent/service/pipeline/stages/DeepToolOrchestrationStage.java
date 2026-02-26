@@ -108,29 +108,52 @@ public class DeepToolOrchestrationStage implements Processor<Void, SseEnvelope> 
     private List<ToolCallIntent> determineToolCalls(PipelineContext context, DeepPlan plan) {
         List<ToolCallIntent> intents = new ArrayList<>();
         
-        // Simple heuristic: check subtasks for keywords that map to tools
+        // Enhanced heuristic: check subtasks for keywords that map to tools
+        // Supports both English and Chinese keywords
         for (String subtask : plan.subtasks()) {
             String subtaskLower = subtask.toLowerCase();
             
-            if (subtaskLower.contains("analyze") || subtaskLower.contains("examine")) {
+            // Analyze / examine — English + Chinese
+            if (subtaskLower.contains("analyze") || subtaskLower.contains("analyse")
+                    || subtaskLower.contains("examine") || subtaskLower.contains("evaluate")
+                    || subtaskLower.contains("assess") || subtaskLower.contains("分析")
+                    || subtaskLower.contains("评估") || subtaskLower.contains("检查")) {
                 intents.add(new ToolCallIntent(
                     "reasoning.analyze",
                     Map.of("data", subtask, "question", plan.objective())
                 ));
-            } else if (subtaskLower.contains("compare") || subtaskLower.contains("contrast")) {
+            } else if (subtaskLower.contains("compare") || subtaskLower.contains("contrast")
+                    || subtaskLower.contains("对比") || subtaskLower.contains("比较")) {
                 intents.add(new ToolCallIntent(
                     "reasoning.compare",
                     Map.of("items", List.of(subtask), "criteria", plan.objective())
                 ));
-            } else if (subtaskLower.contains("remember") || subtaskLower.contains("store")) {
+            } else if (subtaskLower.contains("search") || subtaskLower.contains("find")
+                    || subtaskLower.contains("retrieve") || subtaskLower.contains("look up")
+                    || subtaskLower.contains("查找") || subtaskLower.contains("搜索")
+                    || subtaskLower.contains("检索") || subtaskLower.contains("查询")) {
+                intents.add(new ToolCallIntent(
+                    "kb.search",
+                    Map.of("query", subtask)
+                ));
+            } else if (subtaskLower.contains("remember") || subtaskLower.contains("store")
+                    || subtaskLower.contains("save") || subtaskLower.contains("记住")
+                    || subtaskLower.contains("存储") || subtaskLower.contains("保存")) {
                 intents.add(new ToolCallIntent(
                     "memory.store",
                     Map.of("lane", "facts", "key", "subtask_" + intents.size(), "value", subtask, "ttl", 1800)
                 ));
-            } else if (subtaskLower.contains("recall") || subtaskLower.contains("retrieve")) {
+            } else if (subtaskLower.contains("recall") || subtaskLower.contains("回忆") 
+                    || subtaskLower.contains("获取")) {
                 intents.add(new ToolCallIntent(
                     "memory.recall",
                     Map.of("lane", "facts", "key", "context")
+                ));
+            } else {
+                // Default: treat any subtask as a search intent so tools are never empty
+                intents.add(new ToolCallIntent(
+                    "kb.search",
+                    Map.of("query", subtask)
                 ));
             }
             

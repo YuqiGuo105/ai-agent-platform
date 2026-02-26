@@ -5,6 +5,7 @@ import com.mrpot.agent.common.api.ScopeMode;
 import com.mrpot.agent.common.policy.ExecutionPolicy;
 import com.mrpot.agent.common.sse.StageNames;
 import com.mrpot.agent.service.ConversationHistoryService;
+import com.mrpot.agent.service.telemetry.RunLogPublisher;
 import com.mrpot.agent.model.ChatMessage;
 import com.mrpot.agent.service.pipeline.PipelineContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,13 +26,15 @@ import static org.mockito.Mockito.*;
 class HistoryStageTest {
 
     private ConversationHistoryService conversationHistoryService;
+    private RunLogPublisher runLogPublisher;
     private HistoryStage historyStage;
     private PipelineContext context;
 
     @BeforeEach
     void setUp() {
         conversationHistoryService = Mockito.mock(ConversationHistoryService.class);
-        historyStage = new HistoryStage(conversationHistoryService);
+        runLogPublisher = Mockito.mock(RunLogPublisher.class);
+        historyStage = new HistoryStage(conversationHistoryService, runLogPublisher);
 
         RagAnswerRequest request = Mockito.mock(RagAnswerRequest.class);
         ExecutionPolicy policy = Mockito.mock(ExecutionPolicy.class);

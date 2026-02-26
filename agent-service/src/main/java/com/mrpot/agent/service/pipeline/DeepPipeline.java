@@ -84,7 +84,7 @@ public class DeepPipeline {
         // Condition: always execute to get conversation context
         runner.addStage(
             "history_retrieve",
-            new HistoryStage(conversationHistoryService),
+            new HistoryStage(conversationHistoryService, runLogPublisher),
             StageConfig.of(Duration.ofSeconds(5))  // Quick timeout for Redis
         );
         
