@@ -4,8 +4,10 @@ import com.mrpot.agent.common.telemetry.RunDetailDto;
 import com.mrpot.agent.common.telemetry.ToolCallDto;
 import com.mrpot.agent.telemetry.entity.KnowledgeRunEntity;
 import com.mrpot.agent.telemetry.entity.KnowledgeToolCallEntity;
+import com.mrpot.agent.telemetry.repository.KnowledgeRunEventJpaRepository;
 import com.mrpot.agent.telemetry.repository.KnowledgeRunJpaRepository;
 import com.mrpot.agent.telemetry.repository.KnowledgeToolCallJpaRepository;
+import com.mrpot.agent.telemetry.service.KbServiceClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -18,9 +20,11 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -37,6 +41,8 @@ public class TraceQueryController {
 
     private final KnowledgeRunJpaRepository runRepo;
     private final KnowledgeToolCallJpaRepository toolCallRepo;
+    private final KnowledgeRunEventJpaRepository eventRepo;
+    private final KbServiceClient kbServiceClient;
 
     /**
      * Get detailed run information including all tool calls.
@@ -64,19 +70,34 @@ public class TraceQueryController {
     public ResponseEntity<RunDetailDto> getRunDetail(
             @Parameter(description = "Unique run identifier (UUID)", example = "550e8400-e29b-41d4-a716-446655440000", required = true)
             @PathVariable String runId) {
-        log.debug("Getting run details for runId: {}", runId);
+        log.info("Getting run details for runId: {}", runId);
         
         KnowledgeRunEntity run = runRepo.findById(runId).orElse(null);
         if (run == null) {
             log.debug("Run not found: {}", runId);
             return ResponseEntity.notFound().build();
         }
+        
+        // Debug logging for enrichment data
+        String questionsPreview = run.getRecentQuestionsJson() != null 
+            ? run.getRecentQuestionsJson().substring(0, Math.min(100, run.getRecentQuestionsJson().length())) 
+            : "null";
+        log.info("Run {} - historyCount: {}, recentQuestionsJson: {}, kbDocIds: {}, kbHitCount: {}",
+            runId, 
+            run.getHistoryCount(), 
+            questionsPreview,
+            run.getKbDocIds(),
+            run.getKbHitCount());
 
         List<KnowledgeToolCallEntity> toolCalls = toolCallRepo.findByRunIdOrderByCreatedAt(runId);
+        log.info("Run {} - Found {} tool call records in database", runId, toolCalls.size());
 
         List<ToolCallDto> toolDtos = toolCalls.stream()
                 .map(this::toToolCallDto)
                 .collect(Collectors.toList());
+        
+        // Fetch KB context text from KB service (server-side enrichment)
+        String kbContextText = kbServiceClient.fetchKbContextText(run.getKbDocIds());
 
         RunDetailDto dto = new RunDetailDto(
                 run.getId(),
@@ -88,6 +109,7 @@ public class TraceQueryController {
                 run.getTotalLatencyMs(),
                 run.getKbHitCount(),
                 run.getKbDocIds(),              // KB document IDs
+                kbContextText,                  // KB context (fetched from KB service)
                 run.getKbLatencyMs(),           // KB latency
                 run.getHistoryCount(),          // History count
                 run.getRecentQuestionsJson(),   // Recent questions JSON
@@ -99,7 +121,9 @@ public class TraceQueryController {
                 run.getToolCallsCount(),        // Tool calls count
                 run.getToolSuccessRate(),       // Tool success rate
                 run.getFeatureBreakdownJson(),  // Feature breakdown JSON
-                toolDtos
+                toolDtos,
+                run.getCreatedAt(),             // Start timestamp
+                run.getUpdatedAt()              // End timestamp
         );
 
         return ResponseEntity.ok(dto);
@@ -185,6 +209,104 @@ public class TraceQueryController {
         }
 
         return ResponseEntity.ok(runs);
+    }
+
+    /**
+     * Delete a run and all associated data (tool calls, events).
+     *
+     * @param runId the run ID to delete
+     * @return success message or 404 if not found
+     */
+    @DeleteMapping("/{runId}")
+    @Transactional
+    @Operation(
+        summary = "Delete run",
+        description = "Deletes a run and all associated tool calls and events. This operation is irreversible."
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "Run deleted successfully"
+        ),
+        @ApiResponse(
+            responseCode = "404",
+            description = "Run not found"
+        )
+    })
+    public ResponseEntity<Map<String, Object>> deleteRun(
+            @Parameter(description = "Unique run identifier (UUID)", required = true)
+            @PathVariable String runId) {
+        log.info("Deleting run and associated data for runId: {}", runId);
+        
+        // Check if run exists
+        if (!runRepo.existsById(runId)) {
+            log.debug("Run not found for deletion: {}", runId);
+            return ResponseEntity.notFound().build();
+        }
+        
+        // Delete associated tool calls
+        int toolCallsDeleted = toolCallRepo.deleteByRunId(runId);
+        log.debug("Deleted {} tool calls for runId: {}", toolCallsDeleted, runId);
+        
+        // Delete associated events
+        int eventsDeleted = eventRepo.deleteByRunId(runId);
+        log.debug("Deleted {} events for runId: {}", eventsDeleted, runId);
+        
+        // Delete the run itself
+        runRepo.deleteById(runId);
+        log.info("Successfully deleted run {} with {} tool calls and {} events", runId, toolCallsDeleted, eventsDeleted);
+        
+        return ResponseEntity.ok(Map.of(
+            "deleted", true,
+            "runId", runId,
+            "toolCallsDeleted", toolCallsDeleted,
+            "eventsDeleted", eventsDeleted
+        ));
+    }
+
+    /**
+     * Batch delete multiple runs and all associated data.
+     *
+     * @param runIds list of run IDs to delete
+     * @return summary of deleted counts
+     */
+    @DeleteMapping("/batch")
+    @Transactional
+    @Operation(
+        summary = "Batch delete runs",
+        description = "Deletes multiple runs and all their associated tool calls and events. This operation is irreversible."
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "Runs deleted successfully"
+        )
+    })
+    public ResponseEntity<Map<String, Object>> deleteRunsBatch(
+            @RequestBody List<String> runIds) {
+        log.info("Batch deleting {} runs", runIds.size());
+        
+        int totalToolCalls = 0;
+        int totalEvents = 0;
+        int runsDeleted = 0;
+        
+        for (String runId : runIds) {
+            if (runRepo.existsById(runId)) {
+                totalToolCalls += toolCallRepo.deleteByRunId(runId);
+                totalEvents += eventRepo.deleteByRunId(runId);
+                runRepo.deleteById(runId);
+                runsDeleted++;
+            }
+        }
+        
+        log.info("Batch deleted {} runs with {} tool calls and {} events", runsDeleted, totalToolCalls, totalEvents);
+        
+        return ResponseEntity.ok(Map.of(
+            "deleted", true,
+            "runsDeleted", runsDeleted,
+            "toolCallsDeleted", totalToolCalls,
+            "eventsDeleted", totalEvents
+        ));
     }
 
     /**

@@ -31,4 +31,10 @@ public interface KnowledgeToolCallJpaRepository extends JpaRepository<KnowledgeT
      * Count tool calls by run ID.
      */
     long countByRunId(String runId);
+    
+    /**
+     * Delete all tool calls for a specific run.
+     * @return the number of entities deleted
+     */
+    int deleteByRunId(String runId);
 }

@@ -21,4 +21,10 @@ public interface KnowledgeRunEventJpaRepository extends JpaRepository<KnowledgeR
      * Check if an event has been processed.
      */
     boolean existsByEventId(String eventId);
+    
+    /**
+     * Delete all events for a specific run.
+     * @return the number of entities deleted
+     */
+    int deleteByRunId(String runId);
 }
