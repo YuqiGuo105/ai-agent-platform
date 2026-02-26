@@ -37,7 +37,7 @@ public class FileExtractStage implements Processor<Void, Flux<SseEnvelope>> {
         log.info("Extracting {} files for runId={}", fileUrls.size(), context.runId());
         
         // Extract files and store them in context
-        Mono<Void> extractionMono = ragAnswerService.extractFilesMono(fileUrls)
+        Mono<Void> extractionMono = ragAnswerService.extractFilesMono(fileUrls, context.runId())
             .doOnNext(files -> {
                 context.setExtractedFiles(files);
                 long successCount = files.stream().filter(f -> f.isSuccess()).count();

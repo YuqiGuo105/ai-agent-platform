@@ -108,7 +108,7 @@ public class FastPipeline {
         // Condition: policy allows RAG access
         runner.addStage(
             "rag_retrieve",
-            new RagRetrieveStage(kbRetrievalService),
+            new RagRetrieveStage(kbRetrievalService, runLogPublisher),
             StageConfig.conditional(ctx -> ctx.policy().allowRag())
         );
         

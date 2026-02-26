@@ -44,16 +44,17 @@ public class DeepVerificationStage implements Processor<Void, SseEnvelope> {
         return Mono.fromSupplier(() -> {
             // Get reasoning artifacts from context
             Map<String, Object> reasoning = context.getDeepReasoning();
+            String runId = context.runId();
             
             // Run consistency check
-            ConsistencyResult consistencyResult = runConsistencyCheck(reasoning);
+            ConsistencyResult consistencyResult = runConsistencyCheck(reasoning, runId);
             
             // Extract claims for fact-checking
             List<String> claims = extractClaims(reasoning);
             List<String> evidenceSources = extractEvidenceSources(reasoning);
             
             // Run fact check
-            FactCheckResult factCheckResult = runFactCheck(claims, evidenceSources);
+            FactCheckResult factCheckResult = runFactCheck(claims, evidenceSources, runId);
             
             // Build verification report
             VerificationReport report = buildVerificationReport(consistencyResult, factCheckResult);
@@ -108,7 +109,7 @@ public class DeepVerificationStage implements Processor<Void, SseEnvelope> {
     /**
      * Run consistency check using verify.consistency tool.
      */
-    private ConsistencyResult runConsistencyCheck(Map<String, Object> reasoning) {
+    private ConsistencyResult runConsistencyCheck(Map<String, Object> reasoning, String runId) {
         try {
             // Build reasoning artifacts array
             ObjectNode args = mapper.createObjectNode();
@@ -147,7 +148,7 @@ public class DeepVerificationStage implements Processor<Void, SseEnvelope> {
                     null, null, null, null
                 );
                 
-                CallToolResponse response = toolInvoker.call(request).block();
+                CallToolResponse response = toolInvoker.call(request, runId).block();
                 
                 if (response != null && response.ok() && response.result() != null) {
                     JsonNode result = response.result();
@@ -187,7 +188,7 @@ public class DeepVerificationStage implements Processor<Void, SseEnvelope> {
     /**
      * Run fact check using verify.fact_check tool.
      */
-    private FactCheckResult runFactCheck(List<String> claims, List<String> evidenceSources) {
+    private FactCheckResult runFactCheck(List<String> claims, List<String> evidenceSources, String runId) {
         try {
             if (claims.isEmpty()) {
                 return new FactCheckResult(List.of(), List.of());
@@ -209,7 +210,7 @@ public class DeepVerificationStage implements Processor<Void, SseEnvelope> {
                     null, null, null, null
                 );
                 
-                CallToolResponse response = toolInvoker.call(request).block();
+                CallToolResponse response = toolInvoker.call(request, runId).block();
                 
                 if (response != null && response.ok() && response.result() != null) {
                     JsonNode result = response.result();

@@ -53,7 +53,7 @@ public record RagAnswerRequest(
   private static final String DEFAULT_MODEL = "deepseek";
   private static final String DEFAULT_MODE = "FAST";
   private static final int DEFAULT_TOP_K = 5;
-  private static final double MIN_SCORE_DEFAULT = 0.10;
+  private static final double MIN_SCORE_DEFAULT = 0.5;
   private static final Set<String> MODELS = Set.of("deepseek", "gemini", "openai");
 
   public String resolveModel() {

@@ -3,9 +3,11 @@ package com.mrpot.agent.service.pipeline.stages;
 import com.mrpot.agent.common.kb.KbSearchRequest;
 import com.mrpot.agent.common.sse.SseEnvelope;
 import com.mrpot.agent.common.sse.StageNames;
+import com.mrpot.agent.common.telemetry.RunLogEnvelope;
 import com.mrpot.agent.service.KbRetrievalService;
 import com.mrpot.agent.service.pipeline.PipelineContext;
 import com.mrpot.agent.service.pipeline.Processor;
+import com.mrpot.agent.service.telemetry.RunLogPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
@@ -13,7 +15,7 @@ import reactor.core.publisher.Mono;
 import com.mrpot.agent.common.kb.KbDocument;
 import com.mrpot.agent.common.kb.KbHit;
 
-import java.util.ArrayList;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,7 +29,10 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class RagRetrieveStage implements Processor<Void, SseEnvelope> {
     
+    private static final String VERSION = "1";
+    
     private final KbRetrievalService kbRetrievalService;
+    private final RunLogPublisher runLogPublisher;
     
     @Override
     public Mono<SseEnvelope> process(Void input, PipelineContext context) {
@@ -61,6 +66,10 @@ public class RagRetrieveStage implements Processor<Void, SseEnvelope> {
                 
                 log.info("RAG retrieval complete: {} hits, topScore={}, contextLength={} for runId={}",
                     hitCount, topScore, contextLength, context.runId());
+                
+                // Publish run.rag_done telemetry event
+                long ragLatencyMs = context.elapsedMs();
+                publishRagDoneTelemetry(context, hitCount, hits, ragLatencyMs);
                 
                 // Build enriched document results with metadata
                 int limit = Math.min(5, docs.size());
@@ -186,5 +195,41 @@ public class RagRetrieveStage implements Processor<Void, SseEnvelope> {
     private String truncate(String s, int max) {
         if (s == null) return "";
         return s.length() <= max ? s : s.substring(0, max) + "...";
+    }
+    
+    /**
+     * Publish rag_done telemetry event with KB hit count, document IDs, and latency.
+     * Note: KB context text is fetched server-side at query time to avoid large RabbitMQ messages.
+     */
+    private void publishRagDoneTelemetry(PipelineContext context, int kbHitCount, List<KbHit> hits, long kbLatencyMs) {
+        try {
+            // Extract document IDs from hits
+            List<String> kbDocIds = hits.stream()
+                .map(KbHit::id)
+                .collect(Collectors.toList());
+            
+            RunLogEnvelope envelope = new RunLogEnvelope(
+                VERSION,
+                "run.rag_done",
+                context.runId(),
+                context.traceId(),
+                context.sessionId(),
+                context.userId(),
+                context.scopeMode().name(),
+                "deepseek",
+                Instant.now(),
+                Map.of(
+                    "kbHitCount", kbHitCount,
+                    "kbDocIds", kbDocIds,
+                    "kbLatencyMs", kbLatencyMs
+                )
+            );
+            runLogPublisher.publish(envelope);
+            log.debug("Published rag_done telemetry for runId={}: {} hits, {} doc IDs",
+                context.runId(), kbHitCount, kbDocIds.size());
+        } catch (Exception e) {
+            log.warn("Failed to publish RAG telemetry for runId={}: {}",
+                context.runId(), e.getMessage());
+        }
     }
 }

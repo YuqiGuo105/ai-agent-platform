@@ -48,6 +48,16 @@ public class RagAnswerService {
    * Returns a list of FileItem objects.
    */
   public Mono<List<FileItem>> extractFilesMono(List<String> urls) {
+    return extractFilesMono(urls, null);
+  }
+  
+  /**
+   * Extract files from URLs with concurrent processing and timeout handling.
+   * Returns a list of FileItem objects.
+   * @param urls the URLs to extract
+   * @param runId the run ID for telemetry tracking (optional)
+   */
+  public Mono<List<FileItem>> extractFilesMono(List<String> urls, String runId) {
     if (urls == null || urls.isEmpty()) {
       return Mono.just(List.of());
     }
@@ -67,7 +77,7 @@ public class RagAnswerService {
     
     return Flux.fromIterable(safeUrls)
         .flatMap(url ->
-            Mono.fromCallable(() -> extractOneFileBlocking(url))
+            Mono.fromCallable(() -> extractOneFileBlocking(url, runId))
                 .subscribeOn(Schedulers.boundedElastic())
                 .timeout(Duration.ofSeconds(fileExtractionConfig.getAttachTimeoutSeconds()))
                 .onErrorResume(ex -> {
@@ -87,9 +97,9 @@ public class RagAnswerService {
         .collectList();
   }
   
-  private FileItem extractOneFileBlocking(String url) {
+  private FileItem extractOneFileBlocking(String url, String runId) {
     try {
-      CallToolResponse response = invokeFileTool(url);
+      CallToolResponse response = invokeFileTool(url, runId);
       FileItem errorItem = validateToolResponse(response, url);
       if (errorItem != null) {
         return errorItem;
@@ -109,7 +119,7 @@ public class RagAnswerService {
     }
   }
 
-  private CallToolResponse invokeFileTool(String url) {
+  private CallToolResponse invokeFileTool(String url, String runId) {
     try {
       CallToolRequest toolRequest = new CallToolRequest(
           "file.understandUrl",
@@ -119,7 +129,7 @@ public class RagAnswerService {
           null,
           null
       );
-      CallToolResponse response = toolInvoker.call(toolRequest).block();
+      CallToolResponse response = toolInvoker.call(toolRequest, runId).block();
       if (response == null) {
         throw new ToolInvocationException("file.understandUrl", "null response for url: " + url);
       }
