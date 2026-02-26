@@ -86,6 +86,29 @@ public class KbController {
         return ResponseEntity.ok(document);
     }
 
+    // ─── POST /kb/documents/batch ───────────────────────────────────
+    @PostMapping("/documents/batch")
+    @Operation(summary = "Get multiple documents by IDs",
+               description = "Retrieve multiple documents in a single request for efficiency")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Documents found (may be partial if some IDs not found)")
+    })
+    public ResponseEntity<List<KbDocument>> getDocumentsBatch(
+            @Parameter(description = "List of document IDs")
+            @RequestBody List<String> ids) {
+        
+        if (ids == null || ids.isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+        
+        List<KbDocument> documents = ids.stream()
+            .map(kbManagementService::getDocumentById)
+            .filter(doc -> doc != null)
+            .toList();
+            
+        return ResponseEntity.ok(documents);
+    }
+
     // ─── DELETE /kb/documents/{id} ──────────────────────────────────
     @DeleteMapping("/documents/{id}")
     @Operation(summary = "Delete KB document",

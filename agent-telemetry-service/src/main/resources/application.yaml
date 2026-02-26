@@ -41,6 +41,11 @@ app:
     base-url: ${ELASTIC_BASE_URL:https://elasticsearch-production-361a.up.railway.app}
     username: ${ELASTIC_USERNAME:mrpot}
     password: ${ELASTIC_PASSWORD:}
+
+# === KB Service Client Configuration ===
+kb:
+  service:
+    url: ${KB_SERVICE_URL:http://agent-knowledge:8083}
   
   # === ES Outbox Worker Configuration ===
   es-outbox:

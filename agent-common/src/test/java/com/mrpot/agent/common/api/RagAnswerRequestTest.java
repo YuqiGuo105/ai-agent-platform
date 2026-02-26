@@ -69,7 +69,7 @@ public class RagAnswerRequestTest {
   @Test
   void resolveMinScore_withNullOptions_defaultsToMinScoreDefault() {
     var req = new RagAnswerRequest("query", "sess1", "deepseek", null, null, null, "FAST", null, null);
-    assertEquals(0.10, req.resolveMinScore(), 0.0001);
+    assertEquals(0.5, req.resolveMinScore(), 0.0001);
   }
 
   @Test

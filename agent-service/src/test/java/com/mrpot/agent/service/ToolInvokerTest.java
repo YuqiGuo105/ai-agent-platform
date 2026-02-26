@@ -38,7 +38,7 @@ class ToolInvokerTest {
     
     // Create mock telemetry wrapper that passes through to the actual call
     mockTelemetryWrapper = Mockito.mock(ToolCallTelemetryWrapper.class);
-    when(mockTelemetryWrapper.wrapCall(any(CallToolRequest.class), any(String.class), any()))
+    when(mockTelemetryWrapper.wrapCall(any(CallToolRequest.class), org.mockito.ArgumentMatchers.nullable(String.class), any()))
         .thenAnswer(invocation -> {
           Function<CallToolRequest, Mono<CallToolResponse>> fn = invocation.getArgument(2);
           return fn.apply(invocation.getArgument(0));

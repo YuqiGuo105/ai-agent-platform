@@ -4,8 +4,10 @@ import com.mrpot.agent.common.telemetry.RunDetailDto;
 import com.mrpot.agent.common.telemetry.ToolCallDto;
 import com.mrpot.agent.telemetry.entity.KnowledgeRunEntity;
 import com.mrpot.agent.telemetry.entity.KnowledgeToolCallEntity;
+import com.mrpot.agent.telemetry.repository.KnowledgeRunEventJpaRepository;
 import com.mrpot.agent.telemetry.repository.KnowledgeRunJpaRepository;
 import com.mrpot.agent.telemetry.repository.KnowledgeToolCallJpaRepository;
+import com.mrpot.agent.telemetry.service.KbServiceClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -29,13 +31,17 @@ class TraceQueryControllerWithNewFieldsTest {
 
     private KnowledgeRunJpaRepository runRepo;
     private KnowledgeToolCallJpaRepository toolCallRepo;
+    private KnowledgeRunEventJpaRepository eventRepo;
+    private KbServiceClient kbServiceClient;
     private TraceQueryController controller;
 
     @BeforeEach
     void setUp() {
         runRepo = mock(KnowledgeRunJpaRepository.class);
         toolCallRepo = mock(KnowledgeToolCallJpaRepository.class);
-        controller = new TraceQueryController(runRepo, toolCallRepo);
+        eventRepo = mock(KnowledgeRunEventJpaRepository.class);
+        kbServiceClient = mock(KbServiceClient.class);
+        controller = new TraceQueryController(runRepo, toolCallRepo, eventRepo, kbServiceClient);
     }
 
     @Test
