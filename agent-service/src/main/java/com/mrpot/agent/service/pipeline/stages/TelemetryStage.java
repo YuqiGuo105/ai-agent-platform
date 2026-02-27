@@ -187,8 +187,8 @@ public class TelemetryStage implements Processor<Void, SseEnvelope> {
         
         // Tool call metrics (Sprint 6)
         int toolCallsCount = context.getToolCallsCount();
+        data.put("toolCallsCount", toolCallsCount);   // always present, even when 0
         if (toolCallsCount > 0) {
-            data.put("toolCallsCount", toolCallsCount);
             data.put("toolSuccessRate", context.getToolSuccessRate());
         }
         

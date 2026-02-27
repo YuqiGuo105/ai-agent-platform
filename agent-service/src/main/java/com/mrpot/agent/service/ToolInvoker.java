@@ -75,6 +75,9 @@ public class ToolInvoker {
         .retrieve()
         .bodyToMono(CallToolResponse.class)
         .timeout(Duration.ofMillis(timeoutMs))
+        .retryWhen(reactor.util.retry.Retry.max(maxRetries)
+            .filter(e -> e instanceof java.io.IOException
+                      || e instanceof java.util.concurrent.TimeoutException))
         .onErrorResume(e -> {
           ToolError error;
           if (e instanceof java.util.concurrent.TimeoutException) {
