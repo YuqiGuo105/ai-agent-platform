@@ -80,7 +80,7 @@ public class ToolInvoker {
                       || e instanceof java.util.concurrent.TimeoutException))
         .onErrorResume(e -> {
           ToolError error;
-          if (e instanceof java.util.concurrent.TimeoutException) {
+          if (isTimeoutException(e)) {
             error = new ToolError(ToolError.TIMEOUT, "Tool call timeout", true);
           } else {
             error = new ToolError(ToolError.INTERNAL, e.getMessage(), false);
@@ -104,5 +104,39 @@ public class ToolInvoker {
             Instant.now(),
             new ToolError(ToolError.INTERNAL, "Unexpected error: " + e.getMessage(), false)
         )));
+  }
+
+  /**
+   * Check if an exception is a timeout exception by checking the exception type,
+   * its cause chain, and the error message.
+   */
+  private boolean isTimeoutException(Throwable e) {
+    // Check direct instance
+    if (e instanceof java.util.concurrent.TimeoutException) {
+      return true;
+    }
+    
+    // Check cause chain
+    Throwable cause = e.getCause();
+    while (cause != null) {
+      if (cause instanceof java.util.concurrent.TimeoutException) {
+        return true;
+      }
+      cause = cause.getCause();
+    }
+    
+    // Check exception message for timeout indication
+    String message = e.getMessage();
+    if (message != null && message.toLowerCase().contains("timeout")) {
+      return true;
+    }
+    
+    // Check exception class name for timeout indication
+    String className = e.getClass().getName().toLowerCase();
+    if (className.contains("timeout")) {
+      return true;
+    }
+    
+    return false;
   }
 }
