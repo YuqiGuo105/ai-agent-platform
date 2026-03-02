@@ -79,6 +79,21 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
             }
         }
 
+        // Add current page context (yuqi.site only, pre-processed and capped by frontend)
+        Map<String, Object> ext = context.request().ext();
+        if (ext != null && ext.containsKey("pageContextText")) {
+            String pageText = String.valueOf(ext.get("pageContextText"));
+            String pageTitle = ext.containsKey("pageTitle") ? String.valueOf(ext.get("pageTitle")) : "";
+            String pageUrl = ext.containsKey("currentPageUrl") ? String.valueOf(ext.get("currentPageUrl")) : "";
+            if (!pageText.isBlank()) {
+                prompt.append("【PAGE】\n");
+                if (!pageTitle.isBlank()) prompt.append("Title: ").append(pageTitle).append("\n");
+                if (!pageUrl.isBlank()) prompt.append("URL: ").append(pageUrl).append("\n");
+                prompt.append(pageText, 0, Math.min(1500, pageText.length()));
+                prompt.append("\n\n");
+            }
+        }
+
         // Process RAG documents: filter by score, limit to top 3
         List<KbDocument> ragDocs = context.getRagDocs();
         List<KbHit> ragHits = context.getRagHits();
@@ -109,13 +124,42 @@ public class LlmStreamStage implements Processor<Void, Flux<SseEnvelope>> {
         }
 
         // Highlight user question - response language must match this question ONLY
-        prompt.append("=== USER QUESTION ===\n");
-        prompt.append("IMPORTANT: Respond in the SAME LANGUAGE as this question below, regardless of context language.\n");
-        prompt.append("【Q】\n");
-        prompt.append(context.request().question());
-        prompt.append("\n===");
+        String question = context.request().question();
+        String detectedLang = detectLanguage(question);
+        prompt.append("【Q】(language: ").append(detectedLang).append(")\n");
+        prompt.append(question);
+        prompt.append("\n\nYou MUST reply in ").append(detectedLang).append(". NOT the context language.");
 
         return prompt.toString();
+    }
+
+    /**
+     * Simple language detection based on character analysis.
+     * Returns a human-readable language name for the LLM.
+     */
+    private static String detectLanguage(String text) {
+        if (text == null || text.isBlank()) return "English";
+        int cjk = 0, latin = 0, total = 0;
+        boolean hasAccents = false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (Character.isWhitespace(c)) continue;
+            total++;
+            if (c >= '\u4e00' && c <= '\u9fff') cjk++;
+            else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) latin++;
+            else if (c == '\u00e1' || c == '\u00e9' || c == '\u00ed' || c == '\u00f3' || c == '\u00fa'
+                  || c == '\u00f1' || c == '\u00bf' || c == '\u00a1'
+                  || c == '\u00e0' || c == '\u00e8' || c == '\u00f2' || c == '\u00fc'
+                  || c == '\u00e7' || c == '\u00ea' || c == '\u00ee' || c == '\u00f4' || c == '\u00fb') hasAccents = true;
+            // Japanese hiragana/katakana
+            else if ((c >= '\u3040' && c <= '\u309f') || (c >= '\u30a0' && c <= '\u30ff')) return "Japanese";
+            // Korean
+            else if (c >= '\uac00' && c <= '\ud7af') return "Korean";
+        }
+        if (total == 0) return "English";
+        if (cjk > total * 0.3) return "Chinese";
+        if (hasAccents) return "Spanish";  // rough heuristic; covers most accented Latin
+        return "English";
     }
     
     /**

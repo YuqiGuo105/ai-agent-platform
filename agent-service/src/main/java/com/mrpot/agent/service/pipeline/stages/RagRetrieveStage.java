@@ -71,6 +71,43 @@ public class RagRetrieveStage implements Processor<Void, SseEnvelope> {
                 long ragLatencyMs = context.elapsedMs();
                 publishRagDoneTelemetry(context, hitCount, hits, ragLatencyMs);
                 
+                // Page relevance computation — only if frontend sent page context
+                Map<String, Object> ext = context.request().ext();
+                if (ext != null && ext.containsKey("currentPagePattern")) {
+                    String currentPagePattern = String.valueOf(ext.get("currentPagePattern"));
+                    
+                    // The threshold for page-specific match should be stricter than general MIN_RELEVANCE_SCORE
+                    final double PAGE_MATCH_MIN_SCORE = 0.55;
+                    
+                    java.util.List<String> matchedDocIds = new java.util.ArrayList<>();
+                    double topPageScore = 0.0;
+                    
+                    for (int i = 0; i < docs.size(); i++) {
+                        KbDocument doc = docs.get(i);
+                        double score = i < hits.size() ? hits.get(i).score() : 0.0;
+                        
+                        if (score < PAGE_MATCH_MIN_SCORE) continue;
+                        
+                        // Check if this KB document was indexed for the current page pattern
+                        Object docPagePattern = doc.metadata() != null ? doc.metadata().get("pagePattern") : null;
+                        if (currentPagePattern.equals(String.valueOf(docPagePattern))) {
+                            matchedDocIds.add(doc.id() != null ? doc.id() : "doc-" + i);
+                            topPageScore = Math.max(topPageScore, score);
+                        }
+                    }
+                    
+                    boolean isRelevant = !matchedDocIds.isEmpty();
+                    Map<String, Object> pageRelevance = new java.util.HashMap<>();
+                    pageRelevance.put("isRelevant", isRelevant);
+                    pageRelevance.put("score", topPageScore);
+                    pageRelevance.put("matchedDocIds", matchedDocIds);
+                    pageRelevance.put("pagePattern", currentPagePattern);
+                    
+                    context.setPageRelevance(pageRelevance);
+                    log.info("Page relevance computed: isRelevant={}, topScore={}, matchedDocs={} for runId={}",
+                        isRelevant, topPageScore, matchedDocIds.size(), context.runId());
+                }
+                
                 // Build enriched document results with metadata
                 int limit = Math.min(5, docs.size());
                 List<Map<String, Object>> enrichedResults = buildEnrichedResults(docs, hits);

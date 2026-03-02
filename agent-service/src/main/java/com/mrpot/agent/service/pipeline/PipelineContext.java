@@ -73,6 +73,10 @@ public class PipelineContext {
     public static final String KEY_REPLAY_MODE = "replayMode";
     public static final String KEY_ALLOWED_TOOLS = "allowedTools";
     
+    // Page relevance keys (Page-awareness feature)
+    public static final String KEY_PAGE_RELEVANCE = "pageRelevance";
+    public static final String KEY_PAGE_CONTEXT_TEXT = "pageContextText";
+    
     /**
      * Create a new pipeline context.
      *
@@ -612,6 +616,17 @@ public class PipelineContext {
     
     public boolean isReplay() {
         return getReplayMode() != null;
+    }
+    
+    // Page relevance helper methods
+    
+    public void setPageRelevance(Map<String, Object> pageRelevance) {
+        put(KEY_PAGE_RELEVANCE, pageRelevance);
+    }
+    
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getPageRelevance() {
+        return get(KEY_PAGE_RELEVANCE);
     }
     
     /**

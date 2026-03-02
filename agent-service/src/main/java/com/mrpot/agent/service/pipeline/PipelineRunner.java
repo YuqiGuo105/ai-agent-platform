@@ -106,13 +106,19 @@ public class PipelineRunner {
             log.info("Pipeline completed: runId={}, totalLatencyMs={}", 
                 context.runId(), totalLatencyMs);
             
+            // Build final payload with optional pageRelevance
+            java.util.Map<String, Object> finalPayload = new java.util.HashMap<>();
+            finalPayload.put("answer", context.getFinalAnswer());
+            finalPayload.put("totalLatencyMs", totalLatencyMs);
+            // Include page relevance if computed (null if no page context was sent)
+            if (context.getPageRelevance() != null) {
+                finalPayload.put("pageRelevance", context.getPageRelevance());
+            }
+            
             return Flux.just(createEnvelope(
                 StageNames.ANSWER_FINAL,
                 "Complete",
-                Map.of(
-                    "answer", context.getFinalAnswer(),
-                    "totalLatencyMs", totalLatencyMs
-                ),
+                finalPayload,
                 context
             ));
         });

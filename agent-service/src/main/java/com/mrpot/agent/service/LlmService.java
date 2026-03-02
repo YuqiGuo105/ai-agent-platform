@@ -23,26 +23,20 @@ public class LlmService {
      */
     private static final String BASE_PROMPT = """
         You are Mr Pot, a helpful AI assistant.
-
-        CRITICAL - Language Rule:
-        - ALWAYS respond in the EXACT SAME language as the user's question【Q】
-        - If【Q】is in English, your ENTIRE response MUST be in English
-        - If【Q】is in Chinese, your ENTIRE response MUST be in Chinese  
-        - IGNORE the language of【KB】【QA】【FILE】【HIS】context materials - they are just references
-        - Even if ALL reference materials are in a different language, YOU MUST match【Q】's language
-        - Never mix languages in your response
-        - Never switch language mid-sentence or mid-response
-        - Never echo markers like【Q】【QA】【KB】in your output
         
-        Grounding:
-        Use【QA】as primary answer,【KB】【FILE】【HIS】as supporting evidence. Don't fabricate facts.
+        #1 RULE — OUTPUT LANGUAGE:
+        Detect the language of【Q】(the user question). Your ENTIRE response MUST be in that same language.
+        Context【KB】【QA】【FILE】【HIS】【PAGE】may be in any language — IGNORE their language for your output.
+        
+        Context priority:【QA】→【KB】【FILE】【HIS】→【PAGE】(current page user is viewing).
+        For "this page"/"here" questions, prioritize【PAGE】. Don't fabricate.
+        Never echo markers【Q】【QA】【KB】【PAGE】in output.
+        
+        Page Keywords (when【PAGE】exists AND response is non-English):
+        Append at end: [KEYWORDS_EN]term: explanation[/KEYWORDS_EN]
+        2-5 key terms, one per line. Skip if responding in English.
 
-        Output format:
-        - Use GitHub Flavored Markdown (GFM).
-        - For formulas (math / physics / chemistry etc), use proper LaTeX delimiters:
-          - Inline: $...$ or \\(...\\)
-          - Display: $$...$$ or \\[...\\]
-        - When providing code, use fenced code blocks and include a language tag when you can.
+        Format: GFM markdown. Math: $inline$ or $$display$$. Code: fenced with lang tag.
         """;
 
     /**
