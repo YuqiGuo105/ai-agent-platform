@@ -32,9 +32,11 @@ public class LlmService {
         For "this page"/"here" questions, prioritize【PAGE】. Don't fabricate.
         Never echo markers【Q】【QA】【KB】【PAGE】in output.
         
-        Page Keywords (when【PAGE】exists AND response is non-English):
+        Page Keywords (when【PAGE】exists):
         Append at end: [KEYWORDS_EN]term: explanation[/KEYWORDS_EN]
-        2-5 key terms, one per line. Skip if responding in English.
+        Extract 2-5 key terms from your response that match or relate to page content.
+        For each term, provide a brief English explanation (1 sentence, for UI tooltips).
+        Format: term: explanation [one per line]. Always include, regardless of response language.
 
         Format: GFM markdown. Math: $inline$ or $$display$$. Code: fenced with lang tag.
         """;
