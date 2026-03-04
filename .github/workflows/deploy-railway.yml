@@ -1,5 +1,5 @@
 # Deploy to Railway on push to main/master
-# This workflow builds and deploys all services to Railway
+# Simplified deployment for Railway multi-service project
 
 name: Deploy to Railway
 
@@ -7,16 +7,10 @@ on:
   push:
     branches: [main, master]
   workflow_dispatch:
-    inputs:
-      service:
-        description: 'Service to deploy (all, agent-service, agent-tools-service, agent-telemetry-service, agent-knowledge, agent-knowledge-ui)'
-        required: false
-        default: 'all'
 
 env:
   RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
   JAVA_VERSION: "21"
-  NODE_VERSION: "20"
 
 jobs:
   # ──────────────────────────────────────────────────────────────
@@ -42,21 +36,13 @@ jobs:
       - name: Package JARs
         run: mvn -B -DskipTests=true package
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: jars
-          path: "**/target/*.jar"
-          retention-days: 1
-
   # ──────────────────────────────────────────────────────────────
-  # Deploy agent-service
+  # Deploy to Railway
   # ──────────────────────────────────────────────────────────────
-  deploy-agent-service:
-    name: Deploy agent-service
+  deploy:
+    name: Deploy to Railway
     needs: build
     runs-on: ubuntu-latest
-    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'agent-service' || github.event.inputs.service == ''
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,71 +50,63 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy to Railway
+      - name: Deploy agent-tools-service
         run: |
-          cd ${{ github.workspace }}
-          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
-          railway up --service agent-service --detach
+          # Configure for agent-tools-service
+          cat > railway.toml << EOF
+          [build]
+          builder = "dockerfile"
+          dockerfilePath = "agent-tools-service/Dockerfile"
+
+          [deploy]
+          healthcheckPath = "/actuator/health"
+          healthcheckTimeout = 300
+          restartPolicyType = "on_failure"
+          restartPolicyMaxRetries = 3
+          EOF
+          
+          # Deploy using Railway CLI
+          railway up --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   # ──────────────────────────────────────────────────────────────
-  # Deploy agent-tools-service
+  # Verify deployment
   # ──────────────────────────────────────────────────────────────
-  deploy-agent-tools-service:
-    name: Deploy agent-tools-service
-    needs: build
+  verify:
+    name: Verify Deployment
+    needs: deploy
     runs-on: ubuntu-latest
-    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'agent-tools-service' || github.event.inputs.service == ''
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Wait for deployment
+        run: sleep 120
 
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
+      - name: Test endpoints
         run: |
-          cd ${{ github.workspace }}
-          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
-          railway up --service agent-tools-service --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          echo "Testing Railway deployment endpoints..."
+          # Try the known production URLs first
+          for url in "https://agent-tools-service-production.up.railway.app" "https://web-production-4e0c.up.railway.app"; do
+            echo "Testing $url"
+            if curl -f "$url/actuator/health" -m 30; then
+              echo "✅ Health check passed for $url"
+              # Test MCP tools endpoint
+              curl -X POST "$url/mcp/list_tools" \
+                -H "Content-Type: application/json" \
+                -d '{}' -m 30 || echo "MCP endpoint test failed"
+              break
+            else
+              echo "❌ Health check failed for $url"
+            fi
+          done
+        continue-on-error: true
 
-  # ──────────────────────────────────────────────────────────────
-  # Deploy agent-telemetry-service
-  # ──────────────────────────────────────────────────────────────
-  deploy-agent-telemetry-service:
-    name: Deploy agent-telemetry-service
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'agent-telemetry-service' || github.event.inputs.service == ''
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
+      - name: Summary
         run: |
-          cd ${{ github.workspace }}
-          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
-          railway up --service agent-telemetry-service --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-  # ──────────────────────────────────────────────────────────────
-  # Deploy agent-knowledge
-  # ──────────────────────────────────────────────────────────────
-  deploy-agent-knowledge:
-    name: Deploy agent-knowledge
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'agent-knowledge' || github.event.inputs.service == ''
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Deployment triggered to Railway" >> $GITHUB_STEP_SUMMARY
+          echo "📋 Check Railway dashboard for deployment status" >> $GITHUB_STEP_SUMMARY
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli

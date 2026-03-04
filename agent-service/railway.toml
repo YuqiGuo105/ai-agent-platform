@@ -1,17 +1,10 @@
-# Railway configuration for agent-service deployment
-# This tells Railway to use the Dockerfile
-
 [build]
-# Use our multi-stage Dockerfile for building
 builder = "dockerfile"
-# Dockerfile path relative to module root
 dockerfilePath = "agent-service/Dockerfile"
 
 [deploy]
-# Health check endpoint
 healthcheckPath = "/actuator/health"
 healthcheckTimeout = 300
-# Restart policy
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 

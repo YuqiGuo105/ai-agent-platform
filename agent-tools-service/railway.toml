@@ -1,0 +1,21 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "agent-tools-service/Dockerfile"
+
+[deploy]
+healthcheckPath = "/actuator/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[[deploy.variables]]
+name = "SERVER_PORT"
+value = "8081"
+
+[[deploy.variables]]
+name = "SPRING_PROFILES_ACTIVE" 
+value = "production"
+
+[[deploy.variables]]
+name = "JAVA_OPTS"
+value = "-Xmx512m -Xms256m"

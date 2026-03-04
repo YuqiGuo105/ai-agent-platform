@@ -1,23 +1,16 @@
-# Railway configuration for agent-service deployment
-# This tells Railway to use the Dockerfile
-
 [build]
-# Use our multi-stage Dockerfile for building
 builder = "dockerfile"
-# Dockerfile path relative to module root
-dockerfilePath = "agent-service/Dockerfile"
+dockerfilePath = "agent-telemetry-service/Dockerfile"
 
 [deploy]
-# Health check endpoint
 healthcheckPath = "/actuator/health"
 healthcheckTimeout = 300
-# Restart policy
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
 [[deploy.variables]]
 name = "SERVER_PORT"
-value = "8080"
+value = "8082"
 
 [[deploy.variables]]
 name = "SPRING_PROFILES_ACTIVE"
@@ -25,4 +18,4 @@ value = "production"
 
 [[deploy.variables]]
 name = "JAVA_OPTS"
-value = "-Xmx1024m -Xms512m"
+value = "-Xmx512m -Xms256m"
