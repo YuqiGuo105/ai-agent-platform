@@ -8,9 +8,8 @@ healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
-[[deploy.variables]]
-name = "SERVER_PORT"
-value = "8081"
+# Railway automatically provides PORT variable
+# Spring Boot will use it via server.port=${PORT:8080}
 
 [[deploy.variables]]
 name = "SPRING_PROFILES_ACTIVE" 
