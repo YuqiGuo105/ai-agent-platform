@@ -30,8 +30,9 @@ public class ToolTelemetryPublisher {
         try {
             String routingKey = routingKey(event.type());
             rabbitTemplate.convertAndSend(TelemetryAmqpConfig.EXCHANGE, routingKey, event);
-            log.debug("Published tool telemetry: type={}, toolCallId={}", 
-                event.type(), event.toolCallId());
+            log.info("Published tool telemetry: type={}, toolCallId={}, runId={}, toolName={}", 
+                event.type(), event.toolCallId(), event.runId(), 
+                event.data() != null ? event.data().toolName() : "null");
         } catch (Exception e) {
             // CRITICAL: Never affect the main tool call path
             log.warn("Tool telemetry publish failed: type={}, error={}", 

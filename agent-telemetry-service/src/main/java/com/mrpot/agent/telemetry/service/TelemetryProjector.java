@@ -332,6 +332,8 @@ public class TelemetryProjector {
         }
         
         toolCallRepo.save(call);
+        log.info("Saved tool call: id={}, runId={}, toolName={}, ok={}",
+            call.getId(), call.getRunId(), call.getToolName(), call.getOk());
         
         // Add to ES outbox
         addToOutbox(ES_INDEX_TOOL_CALLS, e.toolCallId(), call);

@@ -132,6 +132,9 @@ public class ToolCallTelemetryWrapper {
             int argsSize,
             Map<String, Object> keyInfo) {
         
+        log.info("Emitting tool.start event: toolCallId={}, toolName={}, runId={}",
+            toolCallId, toolName, ctx.runId());
+        
         try {
             ToolTelemetryData data = ToolTelemetryData.builder()
                 .toolName(toolName)
@@ -168,6 +171,9 @@ public class ToolCallTelemetryWrapper {
             CallToolResponse response,
             long durationMs,
             Map<String, Object> argsKeyInfo) {
+        
+        log.info("Emitting tool.end event: toolCallId={}, toolName={}, runId={}, durationMs={}",
+            toolCallId, toolName, ctx.runId(), durationMs);
         
         try {
             JsonNode result = response.result();

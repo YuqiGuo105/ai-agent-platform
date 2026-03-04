@@ -54,9 +54,12 @@ public class RunLogConsumer {
             if (type.startsWith("tool.")) {
                 // Tool telemetry event
                 ToolTelemetryEvent event = objectMapper.treeToValue(json, ToolTelemetryEvent.class);
+                log.info("Received tool event: type={}, toolCallId={}, runId={}, toolName={}", 
+                    event.type(), event.toolCallId(), event.runId(),
+                    event.data() != null ? event.data().toolName() : "null");
                 processed = projector.processToolEvent(event);
-                log.debug("Tool event processed={}: type={}, toolCallId={}", 
-                    processed, event.type(), event.toolCallId());
+                log.info("Tool event processed={}: type={}, toolCallId={}, runId={}", 
+                    processed, event.type(), event.toolCallId(), event.runId());
             } else if (type.startsWith("run.")) {
                 // Run telemetry event
                 RunLogEnvelope env = objectMapper.treeToValue(json, RunLogEnvelope.class);

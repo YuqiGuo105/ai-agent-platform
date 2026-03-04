@@ -1,0 +1,221 @@
+# Deploy to Railway on push to main/master
+# This workflow builds and deploys all services to Railway
+
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to deploy (all, agent-service, agent-tools-service, agent-telemetry-service, agent-knowledge, agent-knowledge-ui)'
+        required: false
+        default: 'all'
+
+env:
+  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  JAVA_VERSION: "21"
+  NODE_VERSION: "20"
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # Build and test before deployment
+  # ──────────────────────────────────────────────────────────────
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Temurin JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Build & Test
+        run: mvn -B -U -DskipITs=true clean verify
+
+      - name: Package JARs
+        run: mvn -B -DskipTests=true package
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jars
+          path: "**/target/*.jar"
+          retention-days: 1
+
+  # ──────────────────────────────────────────────────────────────
+  # Deploy agent-service
+  # ──────────────────────────────────────────────────────────────
+  deploy-agent-service:
+    name: Deploy agent-service
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'agent-service' || github.event.inputs.service == ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: |
+          cd ${{ github.workspace }}
+          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway up --service agent-service --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ──────────────────────────────────────────────────────────────
+  # Deploy agent-tools-service
+  # ──────────────────────────────────────────────────────────────
+  deploy-agent-tools-service:
+    name: Deploy agent-tools-service
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'agent-tools-service' || github.event.inputs.service == ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: |
+          cd ${{ github.workspace }}
+          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway up --service agent-tools-service --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ──────────────────────────────────────────────────────────────
+  # Deploy agent-telemetry-service
+  # ──────────────────────────────────────────────────────────────
+  deploy-agent-telemetry-service:
+    name: Deploy agent-telemetry-service
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'agent-telemetry-service' || github.event.inputs.service == ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: |
+          cd ${{ github.workspace }}
+          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway up --service agent-telemetry-service --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ──────────────────────────────────────────────────────────────
+  # Deploy agent-knowledge
+  # ──────────────────────────────────────────────────────────────
+  deploy-agent-knowledge:
+    name: Deploy agent-knowledge
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'agent-knowledge' || github.event.inputs.service == ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: |
+          cd ${{ github.workspace }}
+          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway up --service agent-knowledge --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ──────────────────────────────────────────────────────────────
+  # Deploy agent-knowledge-ui (Frontend)
+  # ──────────────────────────────────────────────────────────────
+  deploy-agent-knowledge-ui:
+    name: Deploy agent-knowledge-ui
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'agent-knowledge-ui' || github.event.inputs.service == ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'agent-knowledge-ui/package-lock.json'
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: |
+          cd ${{ github.workspace }}
+          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway up --service agent-knowledge-ui --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ──────────────────────────────────────────────────────────────
+  # Post-deployment health checks
+  # ──────────────────────────────────────────────────────────────
+  health-check:
+    name: Health Check
+    needs: [deploy-agent-service, deploy-agent-tools-service, deploy-agent-telemetry-service, deploy-agent-knowledge, deploy-agent-knowledge-ui]
+    runs-on: ubuntu-latest
+    if: always() && !cancelled()
+    steps:
+      - name: Wait for deployments to stabilize
+        run: sleep 60
+
+      - name: Check agent-service health
+        run: |
+          curl -sf "${{ secrets.AGENT_SERVICE_URL }}/actuator/health" || echo "agent-service health check pending"
+        continue-on-error: true
+
+      - name: Check agent-tools-service health
+        run: |
+          curl -sf "${{ secrets.AGENT_TOOLS_SERVICE_URL }}/actuator/health" || echo "agent-tools-service health check pending"
+        continue-on-error: true
+
+      - name: Check agent-telemetry-service health
+        run: |
+          curl -sf "${{ secrets.AGENT_TELEMETRY_SERVICE_URL }}/actuator/health" || echo "agent-telemetry-service health check pending"
+        continue-on-error: true
+
+      - name: Check agent-knowledge health
+        run: |
+          curl -sf "${{ secrets.AGENT_KNOWLEDGE_URL }}/actuator/health" || echo "agent-knowledge health check pending"
+        continue-on-error: true
+
+      - name: Check agent-knowledge-ui health
+        run: |
+          curl -sf "${{ secrets.AGENT_KNOWLEDGE_UI_URL }}/" || echo "agent-knowledge-ui health check pending"
+        continue-on-error: true
+
+      - name: Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-service | ${{ needs.deploy-agent-service.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-tools-service | ${{ needs.deploy-agent-tools-service.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-telemetry-service | ${{ needs.deploy-agent-telemetry-service.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-knowledge | ${{ needs.deploy-agent-knowledge.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| agent-knowledge-ui | ${{ needs.deploy-agent-knowledge-ui.result }} |" >> $GITHUB_STEP_SUMMARY

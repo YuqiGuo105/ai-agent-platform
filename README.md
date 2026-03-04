@@ -366,6 +366,76 @@ mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Dspring.devtools.restart.en
 
 ---
 
+## CI/CD with Railway
+
+The platform includes automated CI/CD pipelines for Railway deployment.
+
+### GitHub Actions Workflows
+
+| Workflow | File | Trigger | Description |
+|----------|------|---------|-------------|
+| Maven CI/CD | `maven-publish.yml` | All branches | Build, test, and quality checks |
+| Deploy to Railway | `deploy-railway.yml` | Push to main/master | Auto-deploy all services |
+
+### Required GitHub Secrets
+
+Configure these secrets in your GitHub repository settings:
+
+| Secret | Description |
+|--------|-------------|
+| `RAILWAY_TOKEN` | Railway API token (get from [Railway Dashboard](https://railway.app/account/tokens)) |
+| `RAILWAY_PROJECT_ID` | Railway project ID |
+| `AGENT_SERVICE_URL` | Production URL for agent-service health checks |
+| `AGENT_TOOLS_SERVICE_URL` | Production URL for agent-tools-service health checks |
+| `AGENT_TELEMETRY_SERVICE_URL` | Production URL for agent-telemetry-service health checks |
+| `AGENT_KNOWLEDGE_URL` | Production URL for agent-knowledge health checks |
+| `AGENT_KNOWLEDGE_UI_URL` | Production URL for agent-knowledge-ui health checks |
+
+### Manual Deployment
+
+You can manually trigger deployment via workflow_dispatch:
+
+```bash
+# Deploy all services
+gh workflow run deploy-railway.yml
+
+# Deploy specific service
+gh workflow run deploy-railway.yml -f service=agent-service
+```
+
+---
+
+## Available MCP Tools
+
+The agent-tools-service provides the following MCP tools:
+
+| Tool Name | Description | TTL |
+|-----------|-------------|-----|
+| `system.ping` | Health check with memory info | 300s |
+| `weather.query` | Query weather for any location (current, forecast, hourly) | 600s |
+| `http.fetch` | Fetch content from URLs via HTTP GET | 300s |
+| `math.calculate` | Mathematical operations (add, subtract, multiply, etc.) | - |
+| `datetime.now` | Date/time operations (now, add, diff) | - |
+| `json.parse` | JSON parsing and extraction (parse, extract, keys, flatten) | - |
+| `text.process` | Text processing (length, wordCount, replace, extract) | - |
+| `kb.search` | Search knowledge base documents | - |
+| `kb.get_document` | Get document by ID | - |
+
+### Deep Mode Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `memory.recall` | Recall information from conversation memory |
+| `memory.store` | Store information to memory |
+| `planning.decompose` | Decompose complex tasks |
+| `planning.next_step` | Get next step in plan |
+| `reasoning.analyze` | Deep analysis of information |
+| `reasoning.compare` | Compare multiple options |
+| `verify.consistency` | Check consistency of information |
+| `verify.fact_check` | Verify facts against knowledge base |
+
+---
+
 ## Production Deployment
 
 For production deployment, use the production compose file:
