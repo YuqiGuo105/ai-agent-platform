@@ -45,6 +45,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check Railway Token
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "❌ RAILWAY_TOKEN not found!"
+            echo "To fix this:"
+            echo "1. Go to https://railway.app/account/tokens"
+            echo "2. Create a new API token"
+            echo "3. Add it as RAILWAY_TOKEN secret in GitHub repo settings"
+            echo "4. Re-run this workflow"
+            echo ""
+            echo "## 🚫 Railway Token Missing" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Action Required**: Set up Railway deployment token" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Steps to fix:" >> $GITHUB_STEP_SUMMARY
+            echo "1. 🔗 Go to [Railway Tokens](https://railway.app/account/tokens)" >> $GITHUB_STEP_SUMMARY
+            echo "2. 🔑 Create a new API token" >> $GITHUB_STEP_SUMMARY
+            echo "3. ⚙️ Add it as \`RAILWAY_TOKEN\` in [GitHub Secrets](https://github.com/${{ github.repository }}/settings/secrets/actions)" >> $GITHUB_STEP_SUMMARY
+            echo "4. 🔄 Re-run this workflow" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Alternative: Manual Deployment" >> $GITHUB_STEP_SUMMARY
+            echo "You can also deploy manually from your local machine:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "cd agent-tools-service" >> $GITHUB_STEP_SUMMARY
+            echo "railway login" >> $GITHUB_STEP_SUMMARY
+            echo "railway up" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          echo "✅ Railway token found"
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
@@ -76,7 +109,15 @@ jobs:
           EOF
           
           # Deploy using Railway CLI
+          echo "🚀 Deploying to Railway..."
           railway up --detach
+          
+          echo "## ✅ Deployment Started" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏗️ Builder: Docker" >> $GITHUB_STEP_SUMMARY  
+          echo "- 📦 Service: agent-tools-service" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔧 Features: WeatherTool + 6 other MCP tools" >> $GITHUB_STEP_SUMMARY
+          echo "- 🌐 Port: 8081" >> $GITHUB_STEP_SUMMARY
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
