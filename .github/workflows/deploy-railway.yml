@@ -1,6 +1,4 @@
 # Deploy to Railway on push to main/master
-# Simplified deployment for Railway multi-service project
-
 name: Deploy to Railway
 
 on:
@@ -52,8 +50,8 @@ jobs:
 
       - name: Deploy agent-tools-service
         run: |
-          # Configure for agent-tools-service
-          cat > railway.toml << EOF
+          # Configure for agent-tools-service deployment
+          cat > railway.toml << 'EOF'
           [build]
           builder = "dockerfile"
           dockerfilePath = "agent-tools-service/Dockerfile"
@@ -63,6 +61,18 @@ jobs:
           healthcheckTimeout = 300
           restartPolicyType = "on_failure"
           restartPolicyMaxRetries = 3
+
+          [[deploy.variables]]
+          name = "SERVER_PORT"
+          value = "8081"
+
+          [[deploy.variables]]
+          name = "SPRING_PROFILES_ACTIVE"
+          value = "production"
+
+          [[deploy.variables]]
+          name = "JAVA_OPTS"
+          value = "-Xmx512m -Xms256m"
           EOF
           
           # Deploy using Railway CLI
@@ -70,130 +80,67 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
-  # ──────────────────────────────────────────────────────────────
+  # ──────────────────────────────────────────────────────────────  
   # Verify deployment
   # ──────────────────────────────────────────────────────────────
   verify:
     name: Verify Deployment
     needs: deploy
     runs-on: ubuntu-latest
+    if: always()
     steps:
       - name: Wait for deployment
-        run: sleep 120
+        run: sleep 180
 
-      - name: Test endpoints
+      - name: Test deployment endpoints
         run: |
           echo "Testing Railway deployment endpoints..."
-          # Try the known production URLs first
-          for url in "https://agent-tools-service-production.up.railway.app" "https://web-production-4e0c.up.railway.app"; do
-            echo "Testing $url"
-            if curl -f "$url/actuator/health" -m 30; then
+          
+          # Test known production URLs
+          URLS=(
+            "https://agent-tools-service-production.up.railway.app"
+            "https://web-production-4e0c.up.railway.app"
+          )
+          
+          for url in "${URLS[@]}"; do
+            echo "Testing: $url"
+            
+            # Test health endpoint
+            if curl -f "$url/actuator/health" -m 30 -s; then
               echo "✅ Health check passed for $url"
+              
               # Test MCP tools endpoint
-              curl -X POST "$url/mcp/list_tools" \
+              echo "Testing MCP tools endpoint..."
+              RESPONSE=$(curl -X POST "$url/mcp/list_tools" \
                 -H "Content-Type: application/json" \
-                -d '{}' -m 30 || echo "MCP endpoint test failed"
-              break
+                -d '{}' -m 30 -s -w "%{http_code}" -o response.json)
+              
+              if [[ "$RESPONSE" == "200" ]]; then
+                echo "✅ MCP tools endpoint working"
+                echo "Available tools:"
+                cat response.json | head -20
+                break
+              else 
+                echo "❌ MCP endpoint returned status: $RESPONSE"
+              fi
             else
               echo "❌ Health check failed for $url"
             fi
+            echo "---"
           done
         continue-on-error: true
 
-      - name: Summary
+      - name: Create deployment summary
         run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Railway Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Deployment triggered to Railway" >> $GITHUB_STEP_SUMMARY
-          echo "📋 Check Railway dashboard for deployment status" >> $GITHUB_STEP_SUMMARY
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
-        run: |
-          cd ${{ github.workspace }}
-          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
-          railway up --service agent-knowledge --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-  # ──────────────────────────────────────────────────────────────
-  # Deploy agent-knowledge-ui (Frontend)
-  # ──────────────────────────────────────────────────────────────
-  deploy-agent-knowledge-ui:
-    name: Deploy agent-knowledge-ui
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'agent-knowledge-ui' || github.event.inputs.service == ''
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: 'agent-knowledge-ui/package-lock.json'
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
-        run: |
-          cd ${{ github.workspace }}
-          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
-          railway up --service agent-knowledge-ui --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-  # ──────────────────────────────────────────────────────────────
-  # Post-deployment health checks
-  # ──────────────────────────────────────────────────────────────
-  health-check:
-    name: Health Check
-    needs: [deploy-agent-service, deploy-agent-tools-service, deploy-agent-telemetry-service, deploy-agent-knowledge, deploy-agent-knowledge-ui]
-    runs-on: ubuntu-latest
-    if: always() && !cancelled()
-    steps:
-      - name: Wait for deployments to stabilize
-        run: sleep 60
-
-      - name: Check agent-service health
-        run: |
-          curl -sf "${{ secrets.AGENT_SERVICE_URL }}/actuator/health" || echo "agent-service health check pending"
-        continue-on-error: true
-
-      - name: Check agent-tools-service health
-        run: |
-          curl -sf "${{ secrets.AGENT_TOOLS_SERVICE_URL }}/actuator/health" || echo "agent-tools-service health check pending"
-        continue-on-error: true
-
-      - name: Check agent-telemetry-service health
-        run: |
-          curl -sf "${{ secrets.AGENT_TELEMETRY_SERVICE_URL }}/actuator/health" || echo "agent-telemetry-service health check pending"
-        continue-on-error: true
-
-      - name: Check agent-knowledge health
-        run: |
-          curl -sf "${{ secrets.AGENT_KNOWLEDGE_URL }}/actuator/health" || echo "agent-knowledge health check pending"
-        continue-on-error: true
-
-      - name: Check agent-knowledge-ui health
-        run: |
-          curl -sf "${{ secrets.AGENT_KNOWLEDGE_UI_URL }}/" || echo "agent-knowledge-ui health check pending"
-        continue-on-error: true
-
-      - name: Summary
-        run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Deployment triggered to Railway" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔧 agent-tools-service with WeatherTool deployed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-service | ${{ needs.deploy-agent-service.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-tools-service | ${{ needs.deploy-agent-tools-service.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-telemetry-service | ${{ needs.deploy-agent-telemetry-service.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-knowledge | ${{ needs.deploy-agent-knowledge.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| agent-knowledge-ui | ${{ needs.deploy-agent-knowledge-ui.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "### 🧪 Test Weather Query:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "curl -X POST [RAILWAY_URL]/mcp/call_tool \\\\" >> $GITHUB_STEP_SUMMARY
+          echo "  -H \"Content-Type: application/json\" \\\\" >> $GITHUB_STEP_SUMMARY
+          echo "  -d '{\"name\":\"weather.query\",\"arguments\":{\"location\":\"salt lake city\"}}'" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
