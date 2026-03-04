@@ -118,9 +118,9 @@ jobs:
             exit 1
           fi
           
-          # Link to Railway project and deploy
-          echo "🔗 Linking to Railway project..."
-          railway link $RAILWAY_PROJECT_ID
+          # Link to Railway project using the correct flag
+          echo "🔗 Linking to Railway project: $RAILWAY_PROJECT_ID"
+          railway link --project=$RAILWAY_PROJECT_ID
           
           echo "🚀 Deploying agent-tools-service to Railway..."
           railway up --service agent-tools-service --detach || railway up --detach
