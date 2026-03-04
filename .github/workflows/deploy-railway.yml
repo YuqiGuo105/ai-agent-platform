@@ -118,9 +118,12 @@ jobs:
             exit 1
           fi
           
-          # Deploy using Railway CLI with project ID
-          echo "🚀 Deploying to Railway..."
-          railway up --detach
+          # Link to Railway project and deploy
+          echo "🔗 Linking to Railway project..."
+          railway link $RAILWAY_PROJECT_ID
+          
+          echo "🚀 Deploying agent-tools-service to Railway..."
+          railway up --service agent-tools-service --detach || railway up --detach
           
           echo "## ✅ Deployment Started" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
