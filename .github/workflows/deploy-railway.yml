@@ -8,6 +8,7 @@ on:
 
 env:
   RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
   JAVA_VERSION: "21"
 
 jobs:
@@ -108,7 +109,16 @@ jobs:
           value = "-Xmx512m -Xms256m"
           EOF
           
-          # Deploy using Railway CLI
+          # Check if project ID is set
+          if [ -z "$RAILWAY_PROJECT_ID" ]; then
+            echo "❌ RAILWAY_PROJECT_ID not found!"
+            echo "1. Go to https://railway.app/dashboard"
+            echo "2. Click your project → Settings → Copy Project ID"
+            echo "3. Add it as RAILWAY_PROJECT_ID in GitHub Secrets"
+            exit 1
+          fi
+          
+          # Deploy using Railway CLI with project ID
           echo "🚀 Deploying to Railway..."
           railway up --detach
           
@@ -120,6 +130,7 @@ jobs:
           echo "- 🌐 Port: 8081" >> $GITHUB_STEP_SUMMARY
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
 
   # ──────────────────────────────────────────────────────────────  
   # Verify deployment
